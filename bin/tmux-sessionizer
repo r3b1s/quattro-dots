@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+
+PREFIX0="$HOME/Local"
+PREFIX1="$HOME/Dev"
+. "$(readlink -f "$(dirname "$0")/..")/shell/tmux_fns"
+
+
+selected=$(find \
+  "$HOME/personal" \
+  "$HOME/Personal" \
+  "$HOME/work" \
+  "$HOME/Work" \
+  "$HOME/repos" \
+  "$HOME/Repos" \
+  "$HOME/other" \
+  "$HOME/Other" \
+  "$PREFIX0/personal" \
+  "$PREFIX0/Personal" \
+  "$PREFIX0/work" \
+  "$PREFIX0/Work" \
+  "$PREFIX0/repos" \
+  "$PREFIX0/Repos" \
+  "$PREFIX0/other" \
+  "$PREFIX0/Other" \
+  "$PREFIX1/personal" \
+  "$PREFIX1/Personal" \
+  "$PREFIX1/work" \
+  "$PREFIX1/Work" \
+  "$PREFIX1/repos" \
+  "$PREFIX1/Repos" \
+  "$PREFIX1/other" \
+  "$PREFIX1/Other" -mindepth 1 -maxdepth 1 -type d | fzf)
+
+if [[ -z $selected ]]; then
+    exit 0
+fi
+
+selected_name=$(basename "$selected" | tr . _)
+tmux_running=$(pgrep tmux)
+
+if [[ -z $TMUX ]] && [[ -z $tmux_running ]]; then
+    tmux new-session -ds "$selected_name" -c "$selected"
+    target_pane=$(tmux display-message -p -t "$selected_name:0.0" "#{pane_id}")
+    tvl "$target_pane" "$selected"
+    tmux attach-session -t "$selected_name"
+    exit 0
+fi
+
+created_session=false
+if ! tmux has-session -t="$selected_name" 2>/dev/null; then
+    tmux new-session -ds "$selected_name" -c "$selected"
+    created_session=true
+fi
+
+if [[ "$created_session" == true ]]; then
+    target_pane=$(tmux display-message -p -t "$selected_name:0.0" "#{pane_id}")
+    tvl "$target_pane" "$selected"
+fi
+
+tmux switch-client -t "$selected_name"

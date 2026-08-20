@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+preferred_sources=(
+  discord_mixed_mic
+  easyeffects_source
+)
+
+declare -a targets=()
+
+source_exists() {
+  pactl list short sources | awk '{print $2}' | grep -Fxq -- "$1"
+}
+
+source_muted() {
+  pactl get-source-mute "$1" | grep -q 'yes'
+}
+
+for source in "${preferred_sources[@]}"; do
+  if source_exists "$source"; then
+    targets+=("$source")
+  fi
+done
+
+if ((${#targets[@]} == 0)); then
+  pactl set-source-mute @DEFAULT_SOURCE@ toggle
+
+  if pactl get-source-mute @DEFAULT_SOURCE@ | grep -q 'yes'; then
+    led=on
+    osd_message='Microphone muted'
+    osd_icon='microphone-muted'
+  else
+    led=off
+    osd_message='Microphone on'
+    osd_icon='microphone'
+  fi
+else
+  primary_source="${targets[0]}"
+
+  if source_muted "$primary_source"; then
+    target_mute=0
+    led=off
+    osd_message='Microphone on'
+    osd_icon='microphone'
+  else
+    target_mute=1
+    led=on
+    osd_message='Microphone muted'
+    osd_icon='microphone-muted'
+  fi
+
+  for source in "${targets[@]}"; do
+    pactl set-source-mute "$source" "$target_mute"
+  done
+fi
+
+omarchy-brightness-keyboard-mute "$led"
+
+case "$osd_message" in
+  'Microphone muted')
+    mpv --no-terminal --really-quiet ~/Audio/ventrilo_mic_mute.mp3 &
+    ;;
+  'Microphone on')
+    mpv --no-terminal --really-quiet ~/Audio/ventrilo_mic_active.mp3 &
+    ;;
+esac
+
+omarchy-osd -i "$osd_icon" -m "$osd_message"

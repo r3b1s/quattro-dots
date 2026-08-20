@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Reference omarchy source configs within
+# your preferred editor for cursory review.
+
+editor() {
+  $EDITOR "$OMARCHY_PATH$1"
+}
+
+open_omarchy_path() {
+  editor ""
+}
+
+open_tmux_cfg() {
+  editor "/config/tmux/tmux.conf"
+}
+
+open_omarchy_skill() {
+  editor "/default/omarchy-skill/SKILL.md"
+}
+
+case $1 in
+  tmux) open_tmux_cfg ;;
+  skill) open_omarchy_skill ;;
+  *) open_omarchy_path ;;
+esac
+

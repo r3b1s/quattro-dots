@@ -1,0 +1,13 @@
+-- Define: VM Passthru Submap
+hl.define_submap("voxtype_suppress", function()
+	hl.bind("Delete", function()
+		hl.dispatch(hl.dsp.submap("reset"), { description = "End Voxtype Suppression", submap = "voxtype_suppress" })
+		hl.dispatch(hl.dsp.exec_cmd('omarchy-notification-send "Disabled Submap: voxtype_suppress"'))
+	end)
+	hl.bind("Super_L", hl.dsp.exec_cmd("exec true"), { transparent = true, ignore_mods = true })
+	hl.bind("Super_R", hl.dsp.exec_cmd("exec true"), { transparent = true, ignore_mods = true })
+	hl.bind("Alt_L", hl.dsp.exec_cmd("exec true"), { transparent = true, ignore_mods = true })
+	hl.bind("Alt_R", hl.dsp.exec_cmd("exec true"), { transparent = true, ignore_mods = true })
+	hl.bind("Control_L", hl.dsp.exec_cmd("exec true"), { transparent = true, ignore_mods = true })
+	hl.bind("Control_R", hl.dsp.exec_cmd("exec true"), { transparent = true, ignore_mods = true })
+end)

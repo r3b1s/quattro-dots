@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+rm "$USER_HOME/.config/environment.d/10-path.conf"
+ln -s -v "$(readlink -f "$(dirname "$0")/..")/systemd/environment.d/10-path.conf" "$USER_HOME/.config/environment.d/10-path.conf"
+
+rm "$USER_HOME/.config/environment.d/telemetry.conf"
+ln -s -v "$(readlink -f "$(dirname "$0")/..")/systemd/environment.d/telemetry.conf" "$USER_HOME/.config/environment.d/telemetry.conf"

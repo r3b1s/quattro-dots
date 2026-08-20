@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+STATE_FILE="/run/user/$(id -u)/voxtype/state"
+PREV_STATE=$(cat "$STATE_FILE" 2>/dev/null || echo "idle")
+
+voxtype record toggle
+
+if [ "$PREV_STATE" = "idle" ]; then
+  omarchy-osd -i keyboard -m 'Dictation: KB will be suppressed'
+else
+  omarchy-shell -q osd close
+fi

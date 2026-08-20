@@ -1,0 +1,58 @@
+# Source tmux layout functions
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/tmux_fns"
+
+# Generic helper for accessing containerized CLIs
+_container_cmd() {
+    local container="$1"
+    local cmd="$2"
+    local use_sudo="${3:-false}"
+    shift 3
+
+    local podman_cmd="podman"
+    [ "$use_sudo" = true ] && podman_cmd="sudo podman"
+
+	# Check for existence
+    if ! $podman_cmd inspect "$container" &>/dev/null; then
+        echo "Container '$container' does not exist" >&2
+        return 1
+    fi
+
+	# Check for state
+    if ! $podman_cmd inspect -f '{{.State.Running}}' "$container" 2>/dev/null | grep -q true; then
+        echo "Container '$container' is not running" >&2
+        return 1
+    fi
+
+	# Run command (& prevent terminal control character corruption)
+    if [ -t 1 ]; then
+        $podman_cmd exec -it "$container" "$cmd" "$@"
+    else
+        $podman_cmd exec -i "$container" "$cmd" "$@"
+    fi
+}
+
+# Declare containerized CLIs using the helper
+# netbird() { _container_cmd netbird-client netbird true "$@"; }
+# km() { _container_cmd komodo km false "$@"; }
+
+# future examples:
+# restic()   { _container_cmd restic-container restic "$@"; }
+# rclone()   { _container_cmd rclone-container rclone "$@"; }
+
+genssh () {
+  ssh-keygen -t ed25519 -a 500 -f "$HOME/.ssh/$1" -C "$2"
+}
+
+# wtype-based universal cut/copy/paste
+univ-cut () {
+  wtype -M ctrl -P x -p x -m shift
+}
+#
+univ-copy () {
+  wtype -M ctrl -P Insert -p Insert -m ctrl
+}
+#
+univ-paste () {
+  wtype -M shift -P Insert -p Insert -m shift
+}
+

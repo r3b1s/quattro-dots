@@ -1,0 +1,134 @@
+##############################
+##############################
+####        General       ####
+##############################
+##############################
+
+## Custom ##################
+export USER_HOME="$HOME"
+export USER_BIN="$USER_HOME/.local/bin"
+
+## Preferred Agentic Harness
+export HARNESS="pi"
+
+## Go
+if command -v go >/dev/null 2>&1; then
+  export GOBIN="$(go env GOPATH)/bin"
+else
+  export GOBIN=""
+fi
+
+## System-Native ###########
+export PATH="$USER_BIN:$USER_HOME/.bun/bin:$USER_HOME/.cache/.bun/bin:$USER_HOME/.cargo/bin${GOBIN:+:$GOBIN}:$PATH"
+# export SSH_AUTH_SOCK=$USER_HOME/.bitwarden-ssh-agent.sock
+export EDITOR=nvim
+export VISUAL=nvim
+
+
+##############################
+##############################
+####  Security & Privacy  ####
+##############################
+##############################
+##                          ##
+## ~~Goals~~                ##
+## - Prioritize PRIVATE     ##
+##   defaults               ##
+##                          ##
+## - Set secure defaults    ##
+##   where possible. (When  ##
+##   they do not infringe   ###
+##   on privacy by default) ##
+##                          ##
+## - Disable/Opt-out:       ##
+##   - Phoning home         ##
+##   - Telemetry            ##
+##                          ##
+## ~~Note~~                 ##
+## Some disabled features   ##
+## might be desired in some ##
+## circumstances.           ##
+##                          ##
+## e.g.) An automatic audit ##
+## during npm pkg installs  ##
+## can be useful & improve  ##
+## security posture.        ##
+##                          ##
+## To enable it, set:       ##
+## NPM_CONFIG_AUDIT=true    ##
+## - or remove this env var ##
+##   (defaults to true)     ##
+##                          ##
+##############################
+
+## AI - gemini-cli #########
+export GEMINI_CLI_HOME="$USER_HOME/.gemini"
+# export GEMINI_SANDBOX=podman
+export GEMINI_TELEMETRY_ENABLED=false                   # Telemetry | Google Gemini CLI (inverted: false = disabled)
+
+## AI - RTK ################
+export RTK_TELEMETRY_DISABLED=1                         # Telemetry | Rust Token Killer
+
+## AI - Crush - CharmBracelet
+export CRUSH_DISABLE_METRICS=1
+export DO_NOT_TRACK=1
+
+## Shells ##################
+export POWERSHELL_TELEMETRY_OPTOUT=1                    # Telemetry | PowerShell
+
+## pkgMngr - npm ###########
+export NPM_CONFIG_FUND=false                            # Phone-Home | npm funding messages
+export NPM_CONFIG_AUDIT=false                           # Phone-Home | npm auto-audit on install
+export NPM_CONFIG_UPDATE_NOTIFIER=false                 # Telemetry | npm update nag
+
+## pkgMngr - homebrew ######
+export HOMEBREW_NO_ANALYTICS=1                          # Telemetry | Homebrew
+
+## pkgMngr - pip ###########
+export PIP_DISABLE_PIP_VERSION_CHECK=1                  # Telemetry | pip
+
+##*~~~~~~~~~~~~~~~~~~~~~~*##
+#      Misc. Telemetry     #
+##*~~~~~~~~~~~~~~~~~~~~~~*##
+
+## Generic Catch-Alls ######
+export DISABLE_TELEMETRY=1                              # Telemetry | generic best-effort
+export DO_NOT_TRACK=1                                   # Telemetry | console do-not-track standard
+
+## Misc. Software ##########
+#  - Included "just in case."
+#  - Not likely that all corresponding
+#    packages will be present on your
+#    system.
+
+## Cloud Providers #########
+export AZURE_CORE_COLLECT_TELEMETRY=0                   # Telemetry | Azure CLI
+export CHECKPOINT_DISABLE=1                             # Telemetry | HashiCorp tools (Terraform, Vault, Packer, Vagrant, Nomad, cdktf) + Prisma
+export GH_NO_TELEMETRY=1                                # Telemetry | GitHub CLI
+export SAM_CLI_TELEMETRY=0                              # Telemetry | AWS SAM CLI
+export WRANGLER_SEND_METRICS=false                      # Telemetry | Cloudflare Wrangler
+
+
+## Software Frameworks #####
+export DOTNET_CLI_TELEMETRY_OPTOUT=1                    # Telemetry | .NET CLI
+export DOTNET_UPGRADEASSISTANT_TELEMETRY_OPTOUT=1       # Telemetry | .NET Upgrade Assistant
+export ASTRO_TELEMETRY_DISABLED=1                       # Telemetry | Astro
+export NG_CLI_ANALYTICS=false                           # Telemetry | Angular CLI
+export EXPO_NO_TELEMETRY=1                              # Telemetry | Expo / React Native
+export GATSBY_TELEMETRY_DISABLED=1                      # Telemetry | Gatsby
+export NEXT_TELEMETRY_DISABLED=1                        # Telemetry | Next.js
+export NUXT_TELEMETRY_DISABLED=1                        # Telemetry | Nuxt
+export REDWOOD_TELEMETRY_DISABLED=1                     # Telemetry | RedwoodJS
+export SLS_TELEMETRY_DISABLED=1                         # Telemetry | Serverless Framework
+
+## Framework-Adjacent ######
+export STORYBOOK_DISABLE_TELEMETRY=1                    # Telemetry | Storybook
+export STORYBOOK_ENABLE_CRASH_REPORTS=0                 # Telemetry | Storybook crash reports (separate toggle)
+export TURBO_TELEMETRY_DISABLED=1                       # Telemetry | Turborepo
+
+## Infrastructure ###########
+export PULUMI_SKIP_UPDATE_CHECK=true                    # Telemetry | Pulumi version checks
+export PULUMI_DISABLE_AUTOMATIC_PLUGIN_ACQUISITION=true # Telemetry | Pulumi plugin fetch
+
+## Uncategorized
+export ALGOLIA_CLI_TELEMETRY=0                          # Telemetry | Algolia CLI (search platform)

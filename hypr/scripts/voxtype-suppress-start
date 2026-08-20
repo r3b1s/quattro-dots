@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+omarchy-osd -i keyboard -m 'Dictation: KB suppressed'
+hyprctl dispatch 'hl.dsp.submap("voxtype_suppress")'

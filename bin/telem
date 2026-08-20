@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# Manage telemetry opt-out environment variables.
+# Source of truth: environment.d/telemetry.conf in this repo.
+# Installed as a symlink at ~/.config/environment.d/telemetry.conf,
+# which systemd --user picks up for all graphical/service sessions.
+set -euo pipefail
+
+CONF_SRC="$(readlink -f "$(dirname "$0")/..")/systemd/environment.d/telemetry.conf"
+CONF_DEST="${HOME}/.config/environment.d/telemetry.conf"
+
+die()  { echo "error: $*" >&2; exit 1; }
+info() { echo "==> $*"; }
+
+cmd_install() {
+  mkdir -p "$(dirname "$CONF_DEST")"
+  if [[ -L "$CONF_DEST" ]]; then
+    info "Already installed (symlink exists at ${CONF_DEST})."
+    return
+  fi
+  [[ -e "$CONF_DEST" ]] && die "${CONF_DEST} exists and is not a symlink. Move it first."
+  ln -s "$CONF_SRC" "$CONF_DEST"
+  info "Linked ${CONF_SRC} -> ${CONF_DEST}"
+  local keys
+  keys=$(grep -v '^\s*#' "$CONF_SRC" | grep -v '^\s*$' | sed 's/=.*//' | tr '\n' ' ' | sed 's/ $//')
+  info "Re-login to apply, or run: systemctl --user import-environment ${keys}"
+}
+
+cmd_list() {
+  echo "Telemetry opt-outs (${CONF_SRC}):"
+  grep -v '^\s*#' "$CONF_SRC" | grep -v '^\s*$' | sort
+}
+
+cmd_add() {
+  local entry="${1:-}"
+  [[ "$entry" =~ ^[A-Za-z_][A-Za-z0-9_]*=.+$ ]] \
+    || die "Usage: add KEY=VALUE"
+
+  local key="${entry%%=*}"
+  if grep -q "^${key}=" "$CONF_SRC"; then
+    die "'${key}' already exists. Use 'set' to update it."
+  fi
+  echo "${entry}" >> "$CONF_SRC"
+  info "Added: ${entry}"
+}
+
+cmd_set() {
+  local entry="${1:-}"
+  [[ "$entry" =~ ^[A-Za-z_][A-Za-z0-9_]*=.+$ ]] \
+    || die "Usage: set KEY=VALUE"
+
+  local key="${entry%%=*}"
+  if grep -q "^${key}=" "$CONF_SRC"; then
+    sed -i "s|^${key}=.*|${entry}|" "$CONF_SRC"
+    info "Updated: ${entry}"
+  else
+    echo "${entry}" >> "$CONF_SRC"
+    info "Added: ${entry}"
+  fi
+}
+
+cmd_rm() {
+  local key="${1:-}"
+  [[ -n "$key" ]] || die "Usage: rm KEY"
+  grep -q "^${key}=" "$CONF_SRC" || die "'${key}' not found in ${CONF_SRC}"
+  sed -i "/^${key}=/d" "$CONF_SRC"
+  info "Removed: ${key}"
+}
+
+usage() {
+  cat <<EOF
+Usage: $(basename "$0") <command> [args]
+
+Commands:
+  install        Symlink telemetry.conf into ~/.config/environment.d/
+  list           Show active opt-outs
+  add KEY=VALUE  Add a new opt-out variable
+  set KEY=VALUE  Add or update an opt-out variable
+  rm KEY         Remove an opt-out variable
+EOF
+}
+
+case "${1:-}" in
+  install) cmd_install ;;
+  list)    cmd_list ;;
+  add)     cmd_add "${2:-}" ;;
+  set)     cmd_set "${2:-}" ;;
+  rm)      cmd_rm "${2:-}" ;;
+  *)       usage; exit 1 ;;
+esac

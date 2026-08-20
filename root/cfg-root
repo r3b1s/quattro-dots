@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ "$EUID" -ne 0 || -z "${SUDO_USER:-}" ]]; then
+  echo "This script must be run with sudo." >&2; exit 1
+fi
+[[ -n "${DOTS:-}" ]] || { echo "Set DOTS to the repo root." >&2; exit 1; }
+mkdir -p /root/.config
+cat "$DOTS/root/shell/bash/appendrc"  > /root/.bashrc
+cat "$DOTS/root/shell/bash/inputrc"   > /root/.inputrc
+cat "$DOTS/root/starship/starship.toml" > /root/.config/starship.toml
+echo "Root user configs imported."
