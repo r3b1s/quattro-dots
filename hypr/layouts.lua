@@ -8,9 +8,9 @@ hl.config({
 	},
 
 	master = {
-		orientation = "left",
+		orientation = "center",
 		new_status = "slave",
-		mfact = 0.5,
+		mfact = 0.34,
 		slave_count_for_center_master = 0,
 	},
 
