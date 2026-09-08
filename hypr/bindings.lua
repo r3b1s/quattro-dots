@@ -356,22 +356,22 @@ unbindAll({
   "SUPER + CTRL + H",
   "SUPER + CTRL + " .. key.h,
 })
-bind("SUPER + CTRL + H", function() hl.dsp.window.resize({ x = -resizeStep("width"),  y = 0, relative = true }) end, "Expand window horizontal", { repeating = true })
+bind("SUPER + CTRL + H", function() hl.dispatch(hl.dsp.window.resize({ x = -resizeStep("width"),  y = 0, relative = true })) end, "Expand window horizontal", { repeating = true })
 unbindAll({
   "SUPER + CTRL + L",
   "SUPER + CTRL + " .. key.l,
 })
-bind("SUPER + CTRL + L", function() hl.dsp.window.resize({ x =  resizeStep("width"),  y = 0, relative = true }) end, "Shrink window horizontal", { repeating = true })
+bind("SUPER + CTRL + L", function() hl.dispatch(hl.dsp.window.resize({ x =  resizeStep("width"),  y = 0, relative = true })) end, "Shrink window horizontal", { repeating = true })
 unbindAll({
   "SUPER + CTRL + K",
   "SUPER + CTRL + " .. key.k,
 })
-bind("SUPER + CTRL + K", function() hl.dsp.window.resize({ x = 0, y =  resizeStep("height"), relative = true }) end, "Expand window vertical", { repeating = true })
+bind("SUPER + CTRL + K", function() hl.dispatch(hl.dsp.window.resize({ x = 0, y =  resizeStep("height"), relative = true })) end, "Expand window vertical", { repeating = true })
 unbindAll({
   "SUPER + CTRL + J",
   "SUPER + CTRL + " .. key.j,
 })
-bind("SUPER + CTRL + J", function() hl.dsp.window.resize({ x = 0, y = -resizeStep("height"), relative = true }) end, "Shrink window vertical", { repeating = true })
+bind("SUPER + CTRL + J", function() hl.dispatch(hl.dsp.window.resize({ x = 0, y = -resizeStep("height"), relative = true })) end, "Shrink window vertical", { repeating = true })
 
 -- Close active window.
 unbind("SUPER + W")
