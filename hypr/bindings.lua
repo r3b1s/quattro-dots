@@ -830,6 +830,11 @@ unbindAll({
   "SUPER + SHIFT + CTRL + slash",
   "SUPER + SHIFT + CTRL + " .. key.slash,
 })
+-- Vesktop opens a transient loading window before its main window.
+hl.window_rule({
+  match = { class = "^(vesktop)$" },
+  workspace = "special:Discord",
+})
 scratchpad(
   "SUPER + Slash",
   "Discord",
@@ -863,7 +868,12 @@ unbindAll({
   "SUPER + CTRL + M",
   "SUPER + CTRL + " .. key.m,
 })
-scratchpad("SUPER + CTRL + M", "Moonlight", uwsmLaunch .. " flatpak run com.moonlight_stream.Moonlight")
+-- Keep native Moonlight windows in its scratchpad workspace.
+hl.window_rule({
+  match = { class = "^(com\\.moonlight_stream\\.Moonlight)$" },
+  workspace = "special:Moonlight",
+})
+scratchpad("SUPER + CTRL + M", "Moonlight", uwsmLaunch .. " moonlight")
 
 -- Grayjay.
 unbindAll({
@@ -912,7 +922,7 @@ scratchpad("SUPER + SHIFT + CTRL + P", "Cryptomator", uwsmLaunch .. " flatpak ru
 
 local launchWebapp = "omarchy-launch-webapp"
 
--- LLM webapps scratchpad.
+-- Hermes Desktop scratchpad.
 unbindAll({
   "SUPER + A",
   "SUPER + " .. key.a,
@@ -923,13 +933,8 @@ unbindAll({
 })
 scratchpad(
   "SUPER + " .. key.a,
-  "LLM Webapps",
-  launchWebapp
-  .. ' "https://chatgpt.com"; '
-  .. launchWebapp
-  .. ' "https://claude.ai"; '
-  .. launchWebapp
-  .. ' "https://google.com"',
+  "Hermes Desktop",
+  uwsmLaunch .. " hermes-desktop",
   {
     layout = "master",
     layout_opts = { orientation = "center" },

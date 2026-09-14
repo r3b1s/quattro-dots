@@ -18,6 +18,10 @@ hl.config({
 		column_width = 0.33,
 		focus_fit_method = 1,
 	},
+	-- Reusing a workspace shortcut returns to the previously active workspace.
+	binds = {
+		workspace_back_and_forth = true,
+	},
 })
 
 hl.unbind("SUPER + S")
