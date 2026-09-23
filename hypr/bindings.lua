@@ -684,7 +684,7 @@ scratchpad("SUPER + T", "term1", terminal, {
   move_description = "Move to term1's dropdown",
 })
 
--- term2.
+-- Steam.
 unbindAll({
   "SUPER + G",
   "SUPER + " .. key.g,
@@ -693,11 +693,23 @@ unbindAll({
   "SUPER + SHIFT + CTRL + G",
   "SUPER + SHIFT + CTRL + " .. key.g,
 })
-scratchpad("SUPER + G", "term2", terminal, {
-  layout = "master",
-  layout_opts = { orientation = "center" },
+-- Steam shows a transient bootstrap/login window before the main client, so
+-- match the class rather than the title and keep every Steam client window
+-- (main client, settings, friends list, bootstrap) in the special workspace
+-- and tiled. Game windows (class steam_app_*) keep the default behavior.
+o.window({ class = "steam", title = "Steam" }, { float = false })
+-- The bootstrap/login and shutdown windows set their own float request; force
+-- them tiled like the rest of the client.
+-- o.window({ class = "^steam$", title = "^(Sign in to Steam|Shutdown)$" }, { tile = true })
+hl.window_rule({
+  match = { class = "^steam$" },
+  workspace = "special:Steam",
+})
+-- Only launches when the special workspace opens while empty, and only if
+-- steam is actually installed; otherwise the workspace stays empty.
+scratchpad("SUPER + G", "Steam", "command -v steam >/dev/null 2>&1 && " .. uwsmLaunch .. " steam", {
   move_keys = "SUPER + SHIFT + CTRL + G",
-  move_description = "Move to term2's dropdown",
+  move_description = "Move to Steam's scratchpad",
 })
 
 -- tmux-sessionizer.
