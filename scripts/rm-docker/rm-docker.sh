@@ -1,22 +1,24 @@
 #!/usr/bin/env bash
 # Remove Omarchy's Docker packages and Docker-specific UFW configuration.
-# This does not install Podman or delete Docker data/configuration directories.
+# Safe to rerun: each cleanup checks whether its target still exists.
+# This does not install Podman or delete Docker data/configuration directories automatically.
 set -Eeuo pipefail
+
+if (( EUID == 0 )); then
+  echo 'Error: do not run this script as root; yay must run as your user.' >&2
+  exit 1
+fi
 
 readonly docker_dns_comment_hex='616c6c6f772d646f636b65722d646e73'
 readonly docker_dns_address='172.17.0.1'
 readonly docker_dns_port='53'
 readonly docker_ufw_mark='# BEGIN UFW AND DOCKER'
 
-if (( EUID == 0 )); then
-  sudo_cmd=()
-else
-  command -v sudo >/dev/null 2>&1 || {
-    echo 'Error: sudo is required (or run this script as root).' >&2
-    exit 1
-  }
-  sudo_cmd=(sudo)
-fi
+command -v sudo >/dev/null 2>&1 || {
+  echo 'Error: sudo is required.' >&2
+  exit 1
+}
+sudo_cmd=(sudo)
 
 run_privileged() {
   "${sudo_cmd[@]}" "$@"
@@ -41,7 +43,9 @@ if ((${#installed_packages[@]})); then
 else
   printf '  (none of the listed packages)\n'
 fi
-printf '\nDocker data directories and user configuration/shortcuts will not be deleted.\n'
+printf '\nDocker data/config paths will be offered for optional deletion after package removal.\n'
+printf 'The stale Docker socket(s), docker0 interface, and local docker group will be removed if present.\n'
+printf 'User configuration/shortcuts, Omarchy-managed systemd settings, and UFW backups will be kept.\n'
 read -r -p 'Continue? [y/N] ' reply
 [[ "$reply" =~ ^[Yy]([Ee][Ss])?$ ]] || {
   echo 'Cancelled.'
@@ -128,5 +132,63 @@ else
   echo 'No listed Docker packages are installed; nothing to remove with yay.'
 fi
 
+# Docker's service units are now disabled/removed, so any remaining API sockets
+# are stale. /var/run commonly aliases /run; check both names without assuming
+# numbered paths or deleting an unexpected non-socket file.
+for socket_path in /run/docker.sock /var/run/docker.sock; do
+  if [[ -S "$socket_path" ]]; then
+    run_privileged rm -f -- "$socket_path"
+    echo "Removed stale socket: $socket_path"
+  elif [[ -e "$socket_path" || -L "$socket_path" ]]; then
+    echo "Warning: leaving $socket_path because it exists but is not a socket." >&2
+  fi
+done
+
+# Remove Docker's default bridge if it survived daemon shutdown.
+if command -v ip >/dev/null 2>&1 && ip link show dev docker0 >/dev/null 2>&1; then
+  run_privileged ip link delete dev docker0
+  echo 'Removed Docker network interface: docker0'
+fi
+
+# Remove only the local docker group, if present. This does not touch Omarchy's
+# Docker launcher, keybinding, alias, or lazydocker configuration.
+if grep -q '^docker:' /etc/group; then
+  run_privileged groupdel docker
+  echo 'Removed local docker group.'
+fi
+
+confirm_and_remove() {
+  local path=$1
+  local kind=$2
+  local reply
+
+  if [[ ! -e "$path" && ! -L "$path" ]]; then
+    echo "Not present; skipping: $path"
+    return
+  fi
+
+  printf '\nOptional cleanup: %s %s\n' "$kind" "$path"
+  if ! IFS= read -r -p 'Delete it? [y/N] ' reply; then
+    reply=''
+  fi
+  if [[ "$reply" =~ ^[Yy]([Ee][Ss])?$ ]]; then
+    if [[ "$kind" == directory ]]; then
+      run_privileged rm -rf -- "$path"
+    else
+      run_privileged rm -f -- "$path"
+    fi
+    echo "Deleted: $path"
+  else
+    echo "Kept: $path"
+  fi
+}
+
+# These prompts are deliberately separate so the user can preserve any
+# directory or daemon configuration independently. Missing targets are skipped,
+# so rerunning after cleanup (or after choosing to keep a target) is safe.
+confirm_and_remove /var/lib/docker directory
+confirm_and_remove /var/lib/containerd directory
+confirm_and_remove /etc/docker/daemon.json file
+
 echo 'Docker removal steps completed.'
-echo 'Review any preserved Docker configuration/data and Omarchy Docker shortcuts manually if desired.'
+echo 'Omarchy-managed systemd settings, UFW backups, and user shortcuts/configuration were kept.'
