@@ -61,6 +61,9 @@ else
   echo "bashrc: appended quattro-dots managed block."
 fi
 
+# Scaffold preferred home directories.
+"$REPO/scaffold-dirs.sh"
+
 echo
 echo "Optional (run manually):"
 echo "  systemctl --user daemon-reload && systemctl --user enable --now syncthing.service"
