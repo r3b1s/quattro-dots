@@ -850,7 +850,7 @@ hl.window_rule({
 scratchpad(
   "SUPER + Slash",
   "Discord",
-  uwsmLaunch .. " flatpak run dev.vencord.Vesktop --ozone-platform-hint=auto",
+  uwsmLaunch .. " vesktop --ozone-platform-hint=auto",
   { move_keys = "SUPER + SHIFT + CTRL + Slash" }
 )
 
