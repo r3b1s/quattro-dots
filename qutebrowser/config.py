@@ -3,7 +3,7 @@
 # Colours come from pinkrot.py, Vimium parity from vimium.py (both linked
 # alongside by install.sh).
 config.load_autoconfig()
-config.source('pinkrot.py')
+# config.source('omarchy_theme.py')
 # Vimium-style shortcuts and search keywords, mirrored from
 # firefox/vimium-options.json. See that file for the conversion notes.
 config.source('vimium.py')

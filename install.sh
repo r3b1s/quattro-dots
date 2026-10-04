@@ -42,6 +42,14 @@ link_file "$REPO/voxtype/config.toml" "$HOME_DIR/.config/voxtype/config.toml"
 link_file "$REPO/tmux/tmux.conf" "$HOME_DIR/.config/tmux/tmux.conf"
 link_file "$REPO/starship/starship.toml" "$HOME_DIR/.config/starship.toml"
 link_file "$REPO/mise/config.toml" "$HOME_DIR/.config/mise/config.toml"
+
+# herdr and qutebrowser write runtime state (logs, sockets, bookmarks, ...)
+# next to their config, so link the individual config files rather than the
+# whole directory.
+link_file "$REPO/herdr/config.toml" "$HOME_DIR/.config/herdr/config.toml"
+link_file "$REPO/qutebrowser/config.py" "$HOME_DIR/.config/qutebrowser/config.py"
+link_file "$REPO/qutebrowser/vimium.py" "$HOME_DIR/.config/qutebrowser/vimium.py"
+
 link_glob "shell/*" "$HOME_DIR/.config/shell"
 link_glob "bin/*" "$HOME_DIR/.local/bin"
 link_glob "systemd/environment.d/*.conf" "$HOME_DIR/.config/environment.d"
