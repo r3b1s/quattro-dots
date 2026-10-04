@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Reload qutebrowser's omarchy colours after a theme switch.
+#
+# config.py sources qutebrowser/omarchy_theme.py, which reads the live theme
+# palette; ':config-source' re-runs config.py in the running instance, so the
+# new colours land without a restart. Silent no-op when qutebrowser is closed.
+
+set -euo pipefail
+
+command -v qutebrowser >/dev/null 2>&1 || exit 0
+pgrep -x qutebrowser >/dev/null 2>&1 || exit 0
+
+qutebrowser :config-source >/dev/null 2>&1 || true

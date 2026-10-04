@@ -49,6 +49,14 @@ link_file "$REPO/mise/config.toml" "$HOME_DIR/.config/mise/config.toml"
 link_file "$REPO/herdr/config.toml" "$HOME_DIR/.config/herdr/config.toml"
 link_file "$REPO/qutebrowser/config.py" "$HOME_DIR/.config/qutebrowser/config.py"
 link_file "$REPO/qutebrowser/vimium.py" "$HOME_DIR/.config/qutebrowser/vimium.py"
+link_file "$REPO/qutebrowser/omarchy_theme.py" "$HOME_DIR/.config/qutebrowser/omarchy_theme.py"
+
+# Reload qutebrowser's colours when the omarchy theme changes.
+link_glob "hooks/theme-set.d/*" "$HOME_DIR/.config/omarchy/hooks/theme-set.d"
+
+# nvim is linked as a directory: its lua/plugins/theme.lua is itself a symlink
+# into the live omarchy theme, so the tree has to be followed as one unit.
+link_file "$REPO/nvim" "$HOME_DIR/.config/nvim"
 
 link_glob "shell/*" "$HOME_DIR/.config/shell"
 link_glob "bin/*" "$HOME_DIR/.local/bin"
