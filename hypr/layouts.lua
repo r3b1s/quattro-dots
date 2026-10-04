@@ -38,3 +38,20 @@ hl.bind("SUPER + SHIFT + S", hl.dsp.layout("orientationnext"), { description = "
 
 hl.unbind("SUPER + ALT + Backspace")
 hl.bind("SUPER + ALT + Backspace", hl.dsp.exec_cmd("hyprland-workspace-layout"), { description = "Cycle Workspace Layout" })
+
+-- Omarchy's workspace-layout toggle persists per-workspace overrides to
+-- $XDG_STATE_HOME/omarchy/workspace-layouts/*.lua and reloads them from
+-- default.hypr.toggles, which runs after every file above. A stale pin (e.g.
+-- "1" -> dwindle) therefore beats general.layout = "master" for that workspace,
+-- which is why some workspaces come up on a non-master layout. Re-assert master
+-- for every numbered workspace once the whole config has loaded, so master is
+-- the default on boot and after every reload. Runtime layout cycling still
+-- overrides it until the next reload.
+local function enforce_master_layout()
+	for workspace = 1, 10 do
+		hl.workspace_rule({ workspace = tostring(workspace), layout = "master" })
+	end
+end
+
+hl.on("hyprland.start", enforce_master_layout)
+hl.on("config.reloaded", enforce_master_layout)
