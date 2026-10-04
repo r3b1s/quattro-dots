@@ -10,6 +10,10 @@ name = "terminal"
 # The active tab is drawn as panel_bg text on an accent background, so panel_bg
 # has to be dark for it to read - same colors as status-left's "#[fg=black,bg=blue]"
 panel_bg = "black"
+# Give the workspace/tab sidebar its own surface so it reads as a frame around
+# the terminal content instead of blending into it. Matches the pinkrot theme's
+# dark_background (#12040a); static here, since herdr does not read colors.toml.
+sidebar_bg = "#12040a"
 
 [terminal]
 # Matches -c "#{pane_current_path}" on every split, window, and session
