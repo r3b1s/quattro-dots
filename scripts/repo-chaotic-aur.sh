@@ -41,7 +41,7 @@ trap 'rm -f -- "$key_ids"' EXIT
 # system change, so that a rotated key aborts the script instead of silently
 # trusting a stale one.
 verify_primary_key() {
-  if ! curl -fsSL --retry 3 -- "$keyids_url" -o "$key_ids"; then
+  if ! curl -fsSL --retry 3 -o "$key_ids" -- "$keyids_url"; then
     echo "Error: could not download the Chaotic-AUR key list from $keyids_url" >&2
     return 1
   fi
