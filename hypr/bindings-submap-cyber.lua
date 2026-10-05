@@ -25,6 +25,27 @@ local omarchyLaunchBrowser = "omarchy launch browser"
 local launchWebapp = "omarchy-launch-webapp"
 local scratchpadPrefix = "Scratchpad:"
 
+-- Keycodes, needed only for the Omarchy defaults that are written as code:NN
+-- rather than by keysym (the coarse resize steps, the bracket-key webcam
+-- overlay controls, and the silent workspace moves).
+local key = {
+  one = "code:10",
+  two = "code:11",
+  three = "code:12",
+  four = "code:13",
+  five = "code:14",
+  six = "code:15",
+  seven = "code:16",
+  eight = "code:17",
+  nine = "code:18",
+  zero = "code:19",
+  minus = "code:20",
+  equal = "code:21",
+  o = "code:32",
+  bracketleft = "code:34",
+  bracketright = "code:35",
+}
+
 local function bind(keys, action, description, opts)
   opts = opts or {}
   opts.description = description
@@ -171,6 +192,40 @@ hl.define_submap("cyber", function()
     )
   end
 
+  -- Cycle windows without alt-tab reaching past the layer.
+  bind("ALT + TAB", hl.dsp.window.cycle_next(), "Focus on next window")
+  bind("ALT + SHIFT + TAB", hl.dsp.window.cycle_next({ next = false }), "Focus on previous window")
+  exec("CTRL + ALT + DELETE", "omarchy-hyprland-window-close-all", "Close all windows")
+
+  -- Move the focused window to a workspace without following it there.
+  for workspace, code in ipairs({
+    key.one, key.two, key.three, key.four, key.five,
+    key.six, key.seven, key.eight, key.nine, key.zero,
+  }) do
+    bind(
+      "SUPER + SHIFT + ALT + " .. code,
+      hl.dsp.window.move({ workspace = workspace, follow = false }),
+      "Move window silently to workspace " .. workspace
+    )
+  end
+
+  -- Coarse resize steps. The plain SUPER and SUPER+SHIFT pairs are unbound in
+  -- the base layer, so only the four remaining modifier stacks are mirrored.
+  for _, item in ipairs({
+    { mods = "SUPER + CTRL + ", x = -300, y = 0, desc = "Expand window left a lot" },
+    { mods = "SUPER + CTRL + ", x = 300, y = 0, desc = "Shrink window left a lot" },
+    { mods = "SUPER + SHIFT + CTRL + ", x = 0, y = -300, desc = "Shrink window up a lot" },
+    { mods = "SUPER + SHIFT + CTRL + ", x = 0, y = 300, desc = "Expand window down a lot" },
+    { mods = "SUPER + ALT + ", x = -25, y = 0, desc = "Expand window left a little" },
+    { mods = "SUPER + ALT + ", x = 25, y = 0, desc = "Shrink window left a little" },
+    { mods = "SUPER + SHIFT + ALT + ", x = 0, y = -25, desc = "Shrink window up a little" },
+    { mods = "SUPER + SHIFT + ALT + ", x = 0, y = 25, desc = "Expand window down a little" },
+  }) do
+    for _, k in ipairs({ key.minus, key.equal }) do
+      bind(item.mods .. k, hl.dsp.window.resize({ x = item.x, y = item.y, relative = true }), item.desc, { repeating = true })
+    end
+  end
+
   -- Omarchy's own scratchpad, which launches omarchy-agent. The cyber layer
   -- keeps its own sup_* scratchpads; this one is the agent drawer.
   bind("SUPER + grave", hl.dsp.workspace.toggle_special("scratchpad"), "Toggle scratchpad")
@@ -278,6 +333,69 @@ hl.define_submap("cyber", function()
   -- ##########################
 
   -- ##########################
+  -- #### Omarchy Shell ######
+  -- ###                    ###
+
+  -- System menus.
+  exec("SUPER + ESCAPE", "omarchy-menu toggle system", "System menu")
+  exec("SUPER + ALT + SPACE", "omarchy-menu toggle apps", "Apps menu")
+  exec("SUPER + CTRL + SPACE", "omarchy-menu toggle background", "Background switcher")
+  exec("SUPER + SHIFT + CTRL + SPACE", "omarchy-menu toggle theme", "Theme menu")
+  exec("SUPER + CTRL + O", "omarchy-menu toggle toggle", "Toggle menu")
+  exec("SUPER + CTRL + C", "omarchy-menu toggle capture", "Capture menu")
+  exec("SUPER + CTRL + S", "omarchy-menu toggle share", "Share")
+  exec("SUPER + CTRL + R", "omarchy-menu toggle reminder-set", "Set reminder")
+
+  -- Panels. The network and bluetooth toggles live in the System Apps section
+  -- above, as plain execs rather than shell panels.
+  exec("SUPER + CTRL + B", "omarchy-shell shell toggle omarchy.bluetooth", "Bluetooth")
+  exec("SUPER + CTRL + D", "omarchy-shell shell toggle omarchy.monitor", "Display")
+  exec("SUPER + CTRL + N", "omarchy-shell shell toggle omarchy.nightlight", "Nightlight")
+  exec("SUPER + CTRL + E", "omarchy-shell shell toggle omarchy.emojis", "Emojis")
+  exec("SUPER + CTRL + ALT + D", "omarchy-shell shell toggle omarchy.clock", "Calendar")
+  exec("SUPER + CTRL + ALT + E", "omarchy-shell shell toggle omarchy.elsewhen", "World clock")
+
+  -- Toggles and transient OSDs.
+  exec("SUPER + CTRL + Q", "omacalc", "Calculator")
+  exec("SUPER + CTRL + I", "omarchy-toggle-idle", "Toggle locking on idle")
+  exec("SUPER + CTRL + ALT + F", "omarchy-toggle-fullscreen-desktop", "Toggle full screen desktop")
+  exec("SUPER + BACKSPACE", "omarchy-hyprland-window-transparency-toggle", "Toggle window transparency")
+  exec("SUPER + CTRL + DELETE", "omarchy-hyprland-monitor-internal toggle", "Toggle laptop display")
+  exec("SUPER + CTRL + ALT + DELETE", "omarchy-hyprland-monitor-internal-mirror toggle", "Toggle laptop display mirroring")
+  exec("SUPER + CTRL + ALT + T", "omarchy-notification-time", "Show time")
+  exec("SUPER + CTRL + ALT + B", "omarchy-notification-battery", "Show battery remaining")
+  exec("SUPER + CTRL + ALT + W", "omarchy-notification-weather", "Toggle weather")
+  exec("SUPER + CTRL + ALT + R", "omarchy-reminder show", "Show reminders")
+  exec("SUPER + SHIFT + CTRL + R", "omarchy-reminder clear", "Clear reminders")
+  exec("SUPER + SHIFT + CTRL + A", "omarchy-agent --pick", "Agent")
+  exec("SUPER + CTRL + PERIOD", "omarchy-transcode", "Transcode")
+
+  -- Cursor zoom, which reads and writes the live config value.
+  bind("SUPER + CTRL + Z", function()
+    local zoom = hl.get_config("cursor.zoom_factor") or 1
+    hl.config({ cursor = { zoom_factor = zoom + 1 } })
+  end, "Zoom in")
+  bind("SUPER + CTRL + ALT + Z", function()
+    hl.config({ cursor = { zoom_factor = 1 } })
+  end, "Reset zoom")
+
+  -- Terminal-hosted tools. Omarchy exposes these as launcher scripts.
+  exec("SUPER + CTRL + RETURN", "omarchy-launch-terminal-herdr", "Herdr")
+  exec("SUPER + ALT + RETURN", "omarchy-launch-terminal-tmux", "Tmux")
+  exec("SUPER + ALT + K", "omarchy-menu-tmux-keybindings", "Tmux keybindings")
+
+  -- Notifications. SUPER + comma itself is the sup_comma scratchpad in this
+  -- layer, so only the remaining modifier stacks are available here.
+  exec("SUPER + SHIFT + comma", "omarchy-shell notifications dismissAll", "Dismiss all notifications")
+  exec("SUPER + CTRL + comma", "omarchy-toggle-notification-silencing", "Toggle silencing notifications")
+  exec("SUPER + ALT + comma", "omarchy-shell notifications invokeLast", "Invoke last notification")
+  exec("SUPER + SHIFT + ALT + comma", "omarchy-shell notifications showHistory", "Open notification history")
+
+  -- ###                    ###
+  -- #### Omarchy Shell ######
+  -- ##########################
+
+  -- ##########################
   -- ##### Screen Capture #####
   -- ###                    ###
 
@@ -325,6 +443,7 @@ hl.define_submap("cyber", function()
   exec("ALT + XF86AudioLowerVolume", "omarchy-audio-output-volume -1", "Volume down precise", { locked = true, repeating = true })
   exec("XF86AudioMicMute", "omarchy-audio-input-mute-smart", "Mute microphone", { locked = true, repeating = true })
   exec("SHIFT + XF86AudioPause", "omarchy-audio-source-switch", "Switch media source", { locked = true })
+  exec("SHIFT + XF86AudioPlay", "omarchy-audio-source-switch", "Switch media source", { locked = true })
   exec("XF86AudioNext", "omarchy-shell media next", "Next track", { locked = true })
   exec("XF86AudioPrev", "omarchy-shell media previous", "Previous track", { locked = true })
   exec("XF86AudioPlay", "omarchy-shell media playPause", "Play", { locked = true })
@@ -525,6 +644,80 @@ hl.define_submap("cyber", function()
 
   -- ###                    ###
   -- ###### Mouse Controls ####
+  -- ##########################
+
+  -- ##########################
+  -- ###### Final Parity ######
+  -- ###                    ###
+
+  -- Remaining base-layer defaults, so this layer really is a mirror.
+
+  -- Monitor scaling, the down half of the pair above.
+  exec("SUPER + ALT + SLASH", "omarchy-hyprland-monitor-scaling down", "Monitor scaling down")
+
+  -- Omarchy's OCR chord. This layer puts OCR on the bare SUPER + PRINT, but
+  -- the stock combo costs nothing and may already be muscle memory.
+  exec("SUPER + CTRL + PRINT", "omarchy-capture-text", "Extract text (OCR) from screenshot")
+
+  -- The keycode twin of the sup_o scratchpad toggle. bindings.lua binds that
+  -- one by code: rather than by keysym, so both spellings exist side by side.
+  bind("SUPER + " .. key.o, hl.dsp.workspace.toggle_special("sup_o"), "Scratchpad: sup_o")
+
+  -- Move the focused window into the primary browser scratchpad, matching the
+  -- toggle above which has no move key of its own in this layer.
+  bind(
+    "SUPER + SHIFT + CTRL + U",
+    hl.dsp.window.move({ workspace = "special:sup_u" }),
+    "Move window to sup_u"
+  )
+
+  -- Webcam overlay resize.
+  exec("SUPER + ALT + " .. key.bracketleft, "omarchy-capture-webcam-resize smaller", "Make webcam overlay smaller")
+  exec("SUPER + ALT + " .. key.bracketright, "omarchy-capture-webcam-resize larger", "Make webcam overlay larger")
+
+  -- Lid switch. Not a keypress: Hyprland emits these when the lid opens and
+  -- closes, so there is nothing to press and nothing can shadow them.
+  exec("switch:on:Lid Switch", "omarchy-system-lid-close", "Lid closed", { locked = true })
+  exec("switch:off:Lid Switch", "omarchy-hyprland-monitor-clamshell", "Lid opened", { locked = true })
+
+  -- Top bar visibility, and Omarchy's stock dictation chord alongside the
+  -- personal SUPER + D toggle in the Voice Capture section above.
+  exec("SUPER + SHIFT + SPACE", "omarchy-toggle-bar", "Toggle top bar")
+  if o.cmd_present("voxtype") then
+    exec("SUPER + CTRL + X", "voxtype record toggle", "Toggle dictation")
+  end
+
+  -- Send the Moonlight-focus chord to a live stream window when one exists.
+  bind(
+    "SHIFT + CTRL + ALT + code:52",
+    hl.dsp.send_shortcut({
+      mods = "SHIFT + CTRL + ALT",
+      key = "code:52",
+      window = "class:com.moonlight_stream.Moonlight",
+    }),
+    "Toggle Moonlight Focus"
+  )
+
+  -- Move the focused window into Omarchy's own scratchpad, the counterpart to
+  -- the SUPER + grave toggle above.
+  bind(
+    "SUPER + ALT + S",
+    hl.dsp.window.move({ workspace = "special:scratchpad", follow = false }),
+    "Move window to scratchpad"
+  )
+
+  -- Entries into the gaps-resize and VM-passthrough submaps. Both replace the
+  -- active submap rather than stacking on it, so taking either one from cyber
+  -- leaves cyber and its exit chord behind; Escape returns to the base layer.
+  bind("SUPER + CTRL + G", function()
+    hl.dispatch(hl.dsp.submap("gaps-resize"), { description = "Submap: Desktop Resizing" })
+  end, "Submap: Desktop Resizing")
+  bind("SUPER + Delete", function()
+    hl.dispatch(hl.dsp.submap("passthru"), { description = "Submap: Modkey VM Passthru" })
+  end, "Submap: Modkey VM Passthru")
+
+  -- ###                    ###
+  -- ###### Final Parity ######
   -- ##########################
 
   -- ##########################
