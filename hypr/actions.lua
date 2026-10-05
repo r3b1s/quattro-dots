@@ -256,15 +256,15 @@ function M.toggle_i3_mode()
 				dim_special = 1,
 			},
 			general = {
-				gaps_out = 10,
-				gaps_in = 5,
-				border_size = 6,
+				gaps_out = 0,
+				gaps_in = 0,
+				border_size = 1,
 			},
 		})
 
 		set_i3_rules(true)
 		i3_mode.active = true
-		notify("i3 Mode [ON]", "rgb(40a02b)", "ok")
+		hl.dispatch(hl.dsp.exec_cmd('omarchy-notification-send "i3 mode on" "0 gaps, 1px borders; toggle again to restore"'))
 		return
 	end
 
@@ -297,7 +297,7 @@ function M.toggle_i3_mode()
 	set_i3_rules(false)
 	i3_mode.snapshot = nil
 	i3_mode.active = false
-	notify("i3 Mode [OFF]", "rgb(d20f39)", "warning")
+	hl.dispatch(hl.dsp.exec_cmd('omarchy-notification-send "i3 mode off" "Previous gaps and borders restored"'))
 end
 
 return M
