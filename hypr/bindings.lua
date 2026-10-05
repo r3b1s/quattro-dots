@@ -148,6 +148,14 @@ local key = {
 
 local scratchpadPrefix = "Scratchpad:"
 
+-- Special workspaces are named after the keybinding that opens them:
+--   [super][[_]sft][[_]ctl][[_]alt][_]<key>
+-- SUPER is always first, so it is never preceded by "_" and is written "sup".
+-- Each modifier is written in that fixed order and only when present, so
+-- SUPER + SHIFT + CTRL + O is sup_sft_ctl_o, and the key itself is the xkb
+-- keysym in lowercase (sup_period, sup_equal, sup_comma, sup_slash).
+-- Names are hardcoded at each scratchpad() call, never generated.
+
 -- ##                     ###
 -- ##### Keycode Defs #######
 -- ##########################
@@ -187,6 +195,7 @@ local function dispatch(keys, dispatcher, args, description)
   end
   exec(keys, command, description)
 end
+
 
 local function special(name, options)
   options = options or {}
@@ -499,6 +508,14 @@ unbindAll({
 })
 exec("SUPER + SHIFT + R", "omarchy-capture-screenrecording --stop-recording", "Stop Screen Recording")
 
+-- OCR. Omarchy puts the colour picker here; this layer keeps that on
+-- SUPER + SHIFT + CTRL + ALT + P (above) and gives PRINT to text extraction.
+unbindAll({
+  "SUPER + PRINT",
+  "SUPER + " .. key.print,
+})
+exec("SUPER + PRINT", "omarchy-capture-text", "Extract text (OCR) from screenshot")
+
 -- ###                    ###
 -- ##### Screen Capture #####
 -- ##########################
@@ -552,8 +569,66 @@ if o.cmd_present("voxtype") then
   require("hypr.bindings-submap-voxtype_suppress")
 end
 
+-- ##########################
+-- ###### Clipboard #########
+-- ###                    ###
+
+-- Wipe the whole clipboard history. Omarchy exposes no dispatcher for this;
+-- the panel's own delete-all is a per-entry keypress in a QML surface, so this
+-- replaces the history file with the same empty array the panel writes.
+unbindAll({
+  "SUPER + SHIFT + CTRL + ALT + V",
+  "SUPER + SHIFT + CTRL + ALT + " .. key.v,
+})
+exec(
+  "SUPER + SHIFT + CTRL + ALT + V",
+  "$HOME/.config/hypr/scripts/clipboard-history-wipe",
+  "Wipe clipboard history"
+)
+
+-- ###                    ###
+-- ###### Clipboard #########
+-- ##########################
+
 -- ###                    ###
 -- ##### Voice Capture ######
+-- ##########################
+
+-- ##########################
+-- #### Retired Defaults ####
+-- ###                    ###
+
+-- Omarchy defaults this layer retires outright, with no replacement. None of
+-- these combos is rebound below, so an unbind is the whole job: leaving them
+-- in place would silently keep launching the stock webapp or, for F9, the
+-- stock push-to-talk dictation.
+unbindAll({
+  "SUPER + SHIFT + Y",
+  "SUPER + SHIFT + y",
+  "SUPER + SHIFT + " .. key.y,
+  "SUPER + SHIFT + X",
+  "SUPER + SHIFT + x",
+  "SUPER + SHIFT + " .. key.x,
+  "SUPER + SHIFT + ALT + X",
+  "SUPER + SHIFT + ALT + x",
+  "SUPER + SHIFT + ALT + " .. key.x,
+  "SUPER + SHIFT + G",
+  "SUPER + SHIFT + g",
+  "SUPER + SHIFT + " .. key.g,
+  "SUPER + SHIFT + SLASH",
+  "SUPER + SHIFT + slash",
+  "SUPER + SHIFT + " .. key.slash,
+  "SUPER + SHIFT + RETURN",
+  "SUPER + SHIFT + Return",
+  "SUPER + SHIFT + " .. key.return_key,
+  "SUPER + SHIFT + C",
+  "SUPER + SHIFT + c",
+  "SUPER + SHIFT + " .. key.c,
+  "F9",
+})
+
+-- ###                    ###
+-- #### Retired Defaults ####
 -- ##########################
 
 -- ##########################
@@ -592,6 +667,17 @@ unbindAll({
 })
 exec("SUPER + E", uwsmLaunch .. " nautilus --new-window", "File manager")
 
+-- File manager rooted at the active window's working directory. Omarchy
+-- ships this on SUPER + ALT + SHIFT + F and puts a "new email" webapp on
+-- SUPER + SHIFT + ALT + E; both are retired in favour of this one combo.
+unbindAll({
+  "SUPER + SHIFT + ALT + E",
+  "SUPER + SHIFT + ALT + " .. key.e,
+  "SUPER + ALT + SHIFT + F",
+  "SUPER + ALT + SHIFT + " .. key.f,
+})
+exec("SUPER + SHIFT + ALT + E", "omarchy-launch-nautilus-cwd", "File manager (cwd)")
+
 -- Color picker.
 unbindAll({
   "SUPER + SHIFT + CTRL + ALT + P",
@@ -607,27 +693,38 @@ unbindAll({
 })
 exec("SUPER + B", omarchyLaunchBrowser, "Browser")
 
+-- Qutebrowser, falling back to the default browser when it is not installed.
+unbindAll({
+  "SUPER + SHIFT + B",
+  "SUPER + SHIFT + " .. key.b,
+})
+exec(
+  "SUPER + SHIFT + B",
+  "command -v qutebrowser >/dev/null 2>&1 && " .. uwsmLaunch .. " qutebrowser || " .. omarchyLaunchBrowser,
+  "Qutebrowser"
+)
+
 -- Omarchy default browser scratchpads.
 unbindAll({
   "SUPER + U",
   "SUPER + " .. key.u,
 })
-scratchpad("SUPER + U", "Default-Browser 1", "exec " .. omarchyLaunchBrowser)
+scratchpad("SUPER + U", "sup_u", "exec " .. omarchyLaunchBrowser)
 unbindAll({
   "SUPER + ALT + B",
   "SUPER + ALT + " .. key.b,
 })
-scratchpad("SUPER + ALT + B", "Default-Browser 2", "exec " .. omarchyLaunchBrowser)
+scratchpad("SUPER + ALT + B", "sup_alt_b", "exec " .. omarchyLaunchBrowser)
 
--- Move window to Default-Browser 1 scratchpad workspace.
+-- Move window to the primary browser scratchpad workspace.
 unbindAll({
   "SUPER + SHIFT + CTRL + U",
   "SUPER + SHIFT + CTRL + " .. key.u,
 })
 bind(
   "SUPER + SHIFT + CTRL + U",
-  hl.dsp.window.move({ workspace = "special:Default-Browser 1" }),
-  "Move window to Default-Browser 1"
+  hl.dsp.window.move({ workspace = "special:sup_u" }),
+  "Move window to sup_u"
 )
 
 -- ###                    ###
@@ -677,11 +774,11 @@ unbindAll({
   "SUPER + SHIFT + CTRL + T",
   "SUPER + SHIFT + CTRL + " .. key.t,
 })
-scratchpad("SUPER + T", "term1", terminal, {
+scratchpad("SUPER + T", "sup_t", terminal, {
   layout = "master",
   layout_opts = { orientation = "center" },
   move_keys = "SUPER + SHIFT + CTRL + T",
-  move_description = "Move to term1's dropdown",
+  move_description = "Move to sup_t's dropdown",
 })
 
 -- Steam.
@@ -703,13 +800,13 @@ o.window({ class = "steam", title = "Steam" }, { float = false })
 -- o.window({ class = "^steam$", title = "^(Sign in to Steam|Shutdown)$" }, { tile = true })
 hl.window_rule({
   match = { class = "^steam$" },
-  workspace = "special:Steam",
+  workspace = "special:sup_g",
 })
 -- Only launches when the special workspace opens while empty, and only if
 -- steam is actually installed; otherwise the workspace stays empty.
-scratchpad("SUPER + G", "Steam", "command -v steam >/dev/null 2>&1 && " .. uwsmLaunch .. " steam", {
+scratchpad("SUPER + G", "sup_g", "command -v steam >/dev/null 2>&1 && " .. uwsmLaunch .. " steam", {
   move_keys = "SUPER + SHIFT + CTRL + G",
-  move_description = "Move to Steam's scratchpad",
+  move_description = "Move to sup_g",
 })
 
 -- tmux-sessionizer.
@@ -724,14 +821,14 @@ unbindAll({
   "SUPER + SHIFT + D",
   "SUPER + SHIFT + " .. key.d,
 })
-scratchpad("SUPER + SHIFT + D", "Lazydocker", "exec " .. terminal .. " -e lazydocker")
+scratchpad("SUPER + SHIFT + D", "sup_sft_d", "exec " .. terminal .. " -e lazydocker")
 
 -- Wiremix & Easy Effects: audio input/output filtering, noise cancellation, etc.
 unbindAll({
   "SUPER + SHIFT + W",
   "SUPER + SHIFT + " .. key.w,
 })
-scratchpad("SUPER + SHIFT + W", "Easy-Effects", "easyeffects; xdg-terminal-exec -e wiremix")
+scratchpad("SUPER + SHIFT + W", "sup_sft_w", "easyeffects; xdg-terminal-exec -e wiremix")
 
 -- Network management.
 unbindAll({
@@ -752,7 +849,7 @@ unbindAll({
   "SUPER + P",
   "SUPER + " .. key.p,
 })
-scratchpad("SUPER + P", "btop", terminal .. " -e btop")
+scratchpad("SUPER + P", "sup_p", terminal .. " -e btop")
 unbindAll({
   "SUPER + ALT + P",
   "SUPER + ALT + " .. key.p,
@@ -767,7 +864,19 @@ exec("SUPER + ALT + P", terminal .. " -e btop", "Task Manager")
 -- ### Empty Scratchpads ####
 -- ###                    ###
 
--- Utility scratchpad 1.
+-- Disposable scratchpad. Omarchy closes the active window on SUPER + Q by
+-- default; that is retired here.
+unbindAll({
+  "SUPER + Q",
+  "SUPER + " .. key.q,
+})
+unbindAll({
+  "SUPER + SHIFT + CTRL + Q",
+  "SUPER + SHIFT + CTRL + " .. key.q,
+})
+scratchpad("SUPER + Q", "sup_q", nil, { move_keys = "SUPER + SHIFT + CTRL + Q" })
+
+-- Empty scratchpad.
 unbindAll({
   "SUPER + period",
   "SUPER + Period",
@@ -780,9 +889,9 @@ unbindAll({
   "SUPER + SHIFT + CTRL + PERIOD",
   "SUPER + SHIFT + CTRL + " .. key.period,
 })
-scratchpad("SUPER + Period", "Utility 1", nil, { move_keys = "SUPER + SHIFT + CTRL + Period" })
+scratchpad("SUPER + Period", "sup_period", nil, { move_keys = "SUPER + SHIFT + CTRL + Period" })
 
--- Utility scratchpad 2.
+-- Empty scratchpad.
 unbindAll({
   "SUPER + minus",
   "SUPER + Minus",
@@ -795,9 +904,9 @@ unbindAll({
   "SUPER + SHIFT + CTRL + MINUS",
   "SUPER + SHIFT + CTRL + " .. key.minus,
 })
-scratchpad("SUPER + Minus", "Utility 2", nil, { move_keys = "SUPER + SHIFT + CTRL + Minus" })
+scratchpad("SUPER + Minus", "sup_minus", nil, { move_keys = "SUPER + SHIFT + CTRL + Minus" })
 
--- Utility scratchpad 3.
+-- Empty scratchpad.
 unbindAll({
   "SUPER + Y",
   "SUPER + " .. key.y,
@@ -806,7 +915,7 @@ unbindAll({
   "SUPER + SHIFT + CTRL + Y",
   "SUPER + SHIFT + CTRL + " .. key.y,
 })
-scratchpad("SUPER + Y", "Utility 3", nil, { move_keys = "SUPER + SHIFT + CTRL + Y" })
+scratchpad("SUPER + Y", "sup_y", nil, { move_keys = "SUPER + SHIFT + CTRL + Y" })
 
 -- ###                    ###
 -- ### Empty Scratchpads ####
@@ -829,7 +938,7 @@ unbindAll({
   "SUPER + SHIFT + CTRL + COMMA",
   "SUPER + SHIFT + CTRL + " .. key.comma,
 })
-scratchpad("SUPER + Comma", "Signal", uwsmLaunch .. " signal-desktop", { move_keys = "SUPER + SHIFT + CTRL + Comma" })
+scratchpad("SUPER + Comma", "sup_comma", uwsmLaunch .. " signal-desktop", { move_keys = "SUPER + SHIFT + CTRL + Comma" })
 
 -- Discord.
 unbindAll({
@@ -845,11 +954,11 @@ unbindAll({
 -- Vesktop opens a transient loading window before its main window.
 hl.window_rule({
   match = { class = "^(vesktop)$" },
-  workspace = "special:Discord",
+  workspace = "special:sup_slash",
 })
 scratchpad(
   "SUPER + Slash",
-  "Discord",
+  "sup_slash",
   uwsmLaunch .. " vesktop --ozone-platform-hint=auto",
   { move_keys = "SUPER + SHIFT + CTRL + Slash" }
 )
@@ -865,7 +974,7 @@ unbindAll({
 })
 scratchpad(
   "SUPER + " .. key.o,
-  "Obsidian",
+  "sup_o",
   uwsmLaunch .. " obsidian -disable-gpu",
   { move_keys = "SUPER + SHIFT + CTRL + O" }
 )
@@ -883,16 +992,16 @@ unbindAll({
 -- Keep native Moonlight windows in its scratchpad workspace.
 hl.window_rule({
   match = { class = "^(com\\.moonlight_stream\\.Moonlight)$" },
-  workspace = "special:Moonlight",
+  workspace = "special:sup_ctl_m",
 })
-scratchpad("SUPER + CTRL + M", "Moonlight", uwsmLaunch .. " moonlight")
+scratchpad("SUPER + CTRL + M", "sup_ctl_m", uwsmLaunch .. " moonlight")
 
 -- Grayjay.
 unbindAll({
   "SUPER + M",
   "SUPER + " .. key.m,
 })
-scratchpad("SUPER + M", "Grayjay", uwsmLaunch .. " flatpak run app.grayjay.Grayjay")
+scratchpad("SUPER + M", "sup_m", uwsmLaunch .. " flatpak run app.grayjay.Grayjay")
 
 unbindAll({
   "SUPER + SHIFT + M",
@@ -905,24 +1014,14 @@ unbindAll({
   "SUPER + SHIFT + P",
   "SUPER + SHIFT + " .. key.p,
 })
-scratchpad("SUPER + SHIFT + P", "Bitwarden", uwsmLaunch .. " bitwarden-desktop")
+scratchpad("SUPER + SHIFT + P", "sup_sft_p", uwsmLaunch .. " bitwarden-desktop")
 
 -- Password manager 2: KeepassXC.
 unbindAll({
   "SUPER + CTRL + P",
   "SUPER + CTRL + " .. key.p,
 })
-scratchpad("SUPER + CTRL + P", "KeepassXC", uwsmLaunch .. " keepassxc")
-
--- Cryptomator.
-unbindAll({
-  "SUPER + SHIFT + CTRL + P",
-  "SUPER + SHIFT + CTRL + " .. key.p,
-})
-scratchpad("SUPER + SHIFT + CTRL + P", "Cryptomator", uwsmLaunch .. " flatpak run org.cryptomator.Cryptomator", {
-  layout = "master",
-  layout_opts = { orientation = "center" },
-})
+scratchpad("SUPER + CTRL + P", "sup_ctl_p", uwsmLaunch .. " keepassxc")
 
 -- ###                    ###
 -- ####### Misc Apps ########
@@ -934,39 +1033,20 @@ scratchpad("SUPER + SHIFT + CTRL + P", "Cryptomator", uwsmLaunch .. " flatpak ru
 
 local launchWebapp = "omarchy-launch-webapp"
 
--- Hermes Desktop scratchpad.
+-- Omarchy's stock SUPER + A is "select all"; this layer gives the combo to
+-- the default browser instead.
 unbindAll({
   "SUPER + A",
   "SUPER + " .. key.a,
 })
-unbindAll({
-  "SUPER + SHIFT + CTRL + A",
-  "SUPER + SHIFT + CTRL + " .. key.a,
-})
-scratchpad(
-  "SUPER + " .. key.a,
-  "Hermes Desktop",
-  uwsmLaunch .. " hermes-desktop",
-  {
-    layout = "master",
-    layout_opts = { orientation = "center" },
-    move_keys = "SUPER + SHIFT + CTRL + A",
-  }
-)
+exec("SUPER + A", omarchyLaunchBrowser, "Browser")
 
 -- Dictionary.
 unbindAll({
   "SUPER + I",
   "SUPER + " .. key.i,
 })
-scratchpad("SUPER + I", "Dictionary", launchWebapp .. ' "https://www.onelook.com/thesaurus"')
-
--- Code forge 2: GitLab.
-unbindAll({
-  "SUPER + ALT + G",
-  "SUPER + ALT + " .. key.g,
-})
-scratchpad("SUPER + ALT + G", "GitLab", launchWebapp .. ' "https://gitlab.com"')
+scratchpad("SUPER + I", "sup_i", launchWebapp .. ' "https://www.onelook.com/thesaurus"')
 
 -- Calendar.
 unbindAll({
@@ -975,7 +1055,7 @@ unbindAll({
   "SUPER + EQUAL",
   "SUPER + " .. key.equal,
 })
-scratchpad("SUPER + Equal", "Calendar", launchWebapp .. ' "https://calendar.proton.me"')
+scratchpad("SUPER + Equal", "sup_equal", launchWebapp .. ' "https://calendar.proton.me"')
 unbindAll({
   "SUPER + CTRL + equal",
   "SUPER + CTRL + Equal",
@@ -991,7 +1071,7 @@ unbindAll({
   "SUPER + ALT + EQUAL",
   "SUPER + ALT + " .. key.equal,
 })
-scratchpad("SUPER + ALT + Equal", "Email", launchWebapp .. ' "https://mail.proton.me"')
+scratchpad("SUPER + ALT + Equal", "sup_alt_equal", launchWebapp .. ' "https://mail.proton.me"')
 unbindAll({
   "SUPER + CTRL + ALT + equal",
   "SUPER + CTRL + ALT + Equal",
@@ -1062,3 +1142,5 @@ require("hypr.layouts")
 require("hypr.bindings-submap-voxtype_suppress")
 require("hypr.bindings-submap-gaps-resize")
 require("hypr.bindings-submap-vm-passthru")
+require("hypr.bindings-submap-cyber")
+require("hypr.bindings-submap-voxtype_cyber_suppress")

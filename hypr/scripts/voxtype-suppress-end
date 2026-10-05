@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
 
+# Mirror of voxtype-suppress-start: the active layer tells us where dictation
+# was started from, since the command itself is layer-agnostic.
+if [ "$(hyprctl submap)" = "voxtype_cyber_suppress" ]; then
+  exec bash "$HOME/.config/hypr/scripts/voxtype-suppress-end-cyber"
+fi
+
 omarchy-osd -i keyboard -m 'Dictation: KB re-enabled'
 hyprctl dispatch 'hl.dsp.submap("reset")'

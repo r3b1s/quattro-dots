@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+# Cyber variant of voxtype-suppress-end. Dictation output has finished being
+# typed, so drop the suppression layer and land back in the cyber submap the
+# user started from. Called by voxtype-suppress-end when the active layer is
+# the cyber-specific one.
+
+omarchy-osd -i keyboard -m 'Dictation: KB re-enabled'
+hyprctl dispatch 'hl.dsp.submap("cyber")'

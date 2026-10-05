@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+# Omarchy's clipboard panel keeps its history as a JSON array and watches the
+# file with atomicWrites, so replacing the file (rather than truncating it in
+# place) is what makes the panel pick the change up. An empty array is exactly
+# what the panel's own "delete entire clipboard history" confirm writes, so the
+# on-disk representation stays canonical instead of being invented here.
+HISTORY_FILE="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/clipboard-history.json"
+
+if [ ! -f "$HISTORY_FILE" ]; then
+  omarchy-notification-send "Clipboard history: nothing to wipe"
+  exit 0
+fi
+
+count=$(grep -c '"type"' "$HISTORY_FILE" 2>/dev/null || echo 0)
+
+tmp=$(mktemp "${HISTORY_FILE}.XXXXXX") || exit 1
+printf '[]\n' >"$tmp" || { rm -f "$tmp"; exit 1; }
+chmod --reference="$HISTORY_FILE" "$tmp" 2>/dev/null || true
+mv -f "$tmp" "$HISTORY_FILE" || { rm -f "$tmp"; exit 1; }
+
+omarchy-notification-send "Clipboard history wiped" "Cleared $count entries"

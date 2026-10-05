@@ -1,4 +1,12 @@
 #!/usr/bin/env bash
 
+# Voxtype's pre_output_command is a single static command in voxtype/config.toml,
+# so this cannot be split per-layer in the config. It decides instead: dictation
+# started from cyber must return to cyber, which needs the cyber-specific
+# suppression layer because a submap has no "return to origin" transition.
+if [ "$(hyprctl submap)" = "cyber" ]; then
+  exec bash "$HOME/.config/hypr/scripts/voxtype-suppress-start-cyber"
+fi
+
 omarchy-osd -i keyboard -m 'Dictation: KB suppressed'
 hyprctl dispatch 'hl.dsp.submap("voxtype_suppress")'

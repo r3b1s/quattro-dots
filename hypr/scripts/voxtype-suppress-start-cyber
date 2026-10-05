@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+# Cyber variant of voxtype-suppress-start. Enters the cyber-specific
+# suppression layer, whose exits return to the cyber submap rather than
+# resetting to the default layer. Called by voxtype-suppress-start when
+# dictation was started from cyber.
+
+omarchy-osd -i keyboard -m 'Dictation: KB suppressed'
+hyprctl dispatch 'hl.dsp.submap("voxtype_cyber_suppress")'
