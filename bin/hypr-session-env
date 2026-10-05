@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+# Export the Hyprland/Wayland session environment into the current shell.
+#
+# A plain SSH session, or a terminal started outside the graphical session,
+# has none of these variables, so anything that talks to the compositor fails
+# with "Could not find wayland compositor". hypr-rdp is the case that bit us:
+# it opens one Wayland connection for capture and a second one for input, and
+# an inherited WAYLAND_SOCKET cannot serve both -- wayland-client consumes the
+# variable on the first connect.
+#
+#   eval "$(hypr-session-env)"                # adopt the env in this shell
+#   . "$(command -v hypr-session-env)"        # same, without the eval
+#   hypr-session-env hypr-rdp -u user -p pass  # run one command with the env
+#
+# The values come from the Hyprland runtime lock files, the same source
+# hypr-rdp uses for its own instance discovery.
+set -euo pipefail
+
+runtime_dir() {
+  if [[ -n "${XDG_RUNTIME_DIR:-}" && -d "${XDG_RUNTIME_DIR:-}" ]]; then
+    printf '%s\n' "$XDG_RUNTIME_DIR"
+  else
+    printf '/run/user/%s\n' "$(id -u)"
+  fi
+}
+
+# Prints "<signature> <pid> <wayland-display>" per running instance. The lock
+# file holds the pid on the first line and the display name on the second, the
+# shape hyprland.lock uses.
+running_instances() {
+  local hypr_dir="$1" lock pid display
+
+  for lock in "$hypr_dir"/*/hyprland.lock; do
+    [[ -r "$lock" ]] || continue
+
+    pid="$(sed -n 1p "$lock" 2>/dev/null || true)"
+    display="$(sed -n 2p "$lock" 2>/dev/null || true)"
+    [[ "$pid" =~ ^[0-9]+$ && -n "$display" ]] || continue
+
+    kill -0 "$pid" 2>/dev/null || continue
+
+    printf '%s %s %s\n' "$(basename "$(dirname "$lock")")" "$pid" "$display"
+  done
+}
+
+# Sets signature/display from the single live instance, or from the one matching
+# an already-exported WAYLAND_DISPLAY. More than one candidate is an error:
+# guessing here silently points hyprctl and hypr-rdp at the wrong compositor.
+select_instance() {
+  local -a live=() matches=() entry
+  mapfile -t live < <(running_instances "$1")
+
+  if ((${#live[@]} == 0)); then
+    printf 'error: no running Hyprland instance under %s\n' "$1" >&2
+    printf '       is the compositor running, and are you the same user?\n' >&2
+    return 1
+  fi
+
+  if ((${#live[@]} > 1)) && [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
+    for entry in "${live[@]}"; do
+      [[ " ${entry##* } " == *" ${WAYLAND_DISPLAY} "* ]] && matches+=("$entry")
+    done
+    if ((${#matches[@]} == 1)); then
+      live=("${matches[@]}")
+    elif ((${#matches[@]} == 0)); then
+      printf 'error: WAYLAND_DISPLAY=%s does not match any running instance\n' "$WAYLAND_DISPLAY" >&2
+      return 1
+    else
+      printf 'error: several Hyprland instances match WAYLAND_DISPLAY=%s:\n' "$WAYLAND_DISPLAY" >&2
+      printf '  %s\n' "${matches[@]%% *}" >&2
+      printf 'set HYPRLAND_INSTANCE_SIGNATURE explicitly\n' >&2
+      return 1
+    fi
+  elif ((${#live[@]} > 1)); then
+    printf 'error: several Hyprland instances are running:\n' >&2
+    printf '  %s\n' "${live[@]%% *}" >&2
+    printf 'export WAYLAND_DISPLAY first, or set HYPRLAND_INSTANCE_SIGNATURE explicitly\n' >&2
+    return 1
+  fi
+
+  signature="${live[0]%% *}"
+  display="${live[0]##* }"
+}
+
+# Sourced runs must not kill the calling shell, so every failure path uses
+# `return` there and `exit` everywhere else.
+sourced=0
+(return 0 2>/dev/null) && sourced=1
+
+signature=''
+display=''
+XDG_RUNTIME_DIR="$(runtime_dir)"
+select_instance "$XDG_RUNTIME_DIR/hypr" || {
+  ((sourced)) && return 1 2>/dev/null || exit 1
+}
+
+if ((sourced)); then
+  export XDG_RUNTIME_DIR
+  export WAYLAND_DISPLAY="$display"
+  export HYPRLAND_INSTANCE_SIGNATURE="$signature"
+  # Consumed by the first Wayland connect; leaving it set makes a second
+  # connection (hypr-rdp's input handler) fail.
+  unset WAYLAND_SOCKET
+  printf 'hypr session: WAYLAND_DISPLAY=%s HYPRLAND_INSTANCE_SIGNATURE=%s\n' \
+    "$WAYLAND_DISPLAY" "$HYPRLAND_INSTANCE_SIGNATURE" >&2
+elif (($#)); then
+  export XDG_RUNTIME_DIR
+  export WAYLAND_DISPLAY="$display"
+  export HYPRLAND_INSTANCE_SIGNATURE="$signature"
+  unset WAYLAND_SOCKET
+  exec "$@"
+else
+  printf 'export XDG_RUNTIME_DIR=%q\n' "$XDG_RUNTIME_DIR"
+  printf 'export WAYLAND_DISPLAY=%q\n' "$display"
+  printf 'export HYPRLAND_INSTANCE_SIGNATURE=%q\n' "$signature"
+  printf 'unset WAYLAND_SOCKET\n'
+fi
