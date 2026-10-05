@@ -744,10 +744,10 @@ exec("SUPER + SHIFT + CTRL + ALT + K", "omarchy-menu-keybindings", "Show key bin
 
 -- Toggle i3/game mode.
 unbindAll({
-  "SUPER + SHIFT + CTRL + ALT + G",
-  "SUPER + SHIFT + CTRL + ALT + " .. key.g,
+  "SUPER + SHIFT + I",
+  "SUPER + SHIFT + " .. key.i,
 })
-exec("SUPER + SHIFT + CTRL + ALT + G", "hyprland-toggle-i3-mode", "Toggle i3 mode")
+exec("SUPER + SHIFT + I", "hyprland-toggle-i3-mode", "Toggle i3 mode")
 
 -- ###                    ###
 -- ####### Utilities ########

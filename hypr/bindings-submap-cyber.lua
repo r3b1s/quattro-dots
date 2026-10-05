@@ -505,7 +505,7 @@ hl.define_submap("cyber", function()
   )
 
   exec("SUPER + SHIFT + CTRL + ALT + K", "omarchy-menu-keybindings", "Show key bindings")
-  exec("SUPER + SHIFT + CTRL + ALT + G", "hyprland-toggle-i3-mode", "Toggle i3 mode")
+  exec("SUPER + SHIFT + I", "hyprland-toggle-i3-mode", "Toggle i3 mode")
 
   -- Network / Bluetooth, and the tmux sessionizer.
   exec("SUPER + CTRL + W", "omarchy-shell shell toggle omarchy.network", "Network")
