@@ -41,7 +41,6 @@ link_glob "hypr/scripts/*" "$HOME_DIR/.config/hypr/scripts"
 link_file "$REPO/voxtype/config.toml" "$HOME_DIR/.config/voxtype/config.toml"
 link_file "$REPO/tmux/tmux.conf" "$HOME_DIR/.config/tmux/tmux.conf"
 link_file "$REPO/starship/starship.toml" "$HOME_DIR/.config/starship.toml"
-link_file "$REPO/mise/config.toml" "$HOME_DIR/.config/mise/config.toml"
 
 # herdr and qutebrowser write runtime state (logs, sockets, bookmarks, ...)
 # next to their config, so link the individual config files rather than the
