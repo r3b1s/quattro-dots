@@ -1,0 +1,15 @@
+# Template for ~/.config/wayvnc/config. Rendered by
+# scripts/remote-access-wayvnc.sh, which substitutes __PASSWORD__ and __HOST__
+# with a generated password and the machine hostname. Never symlink this
+# file into place: it would leak the plaintext VNC password into the repo.
+use_relative_paths=true
+address=0.0.0.0
+port=5900
+enable_auth=true
+username=remote
+password=__PASSWORD__
+# Self-signed EC cert for CN=__HOST__ (openssl recipe in the script).
+rsa_private_key_file=rsa_key.pem
+private_key_file=tls_key.pem
+certificate_file=tls_cert.pem
+xkb_layout=us
