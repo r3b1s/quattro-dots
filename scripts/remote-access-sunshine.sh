@@ -9,15 +9,14 @@
 # unit is addressed by its real name (the package ships no literal
 # sunshine.service file, only an Alias= written by enable itself, so the
 # upstream `enable sunshine` fails on first run).
-# Headless mode additionally wires Sunshine into a uwsm-managed Hyprland
-# session that starts at boot, so capture always has a compositor.
-# The headless compositor and sunshine run as *system* units as the invoking
-# user (no dedicated account): this box is never logged into locally, so
-# there is no desktop session to collide with -- and the whole point is
-# streaming YOUR primary omarchy configuration, dotfiles and all. A separate
-# user would stream a stranger's bare desktop.
-# The headless Hyprland instance is a full persistent session:
-# Hyprland -> Moonlight (Sunshine) -> NetBird (wt0).
+# Headless mode reuses the SDDM autologin session: SDDM logs you in at boot
+# (Class=user, seat-active, DRM master granted), uwsm starts YOUR Hyprland
+# with YOUR dotfiles, and sunshine runs as a user unit bound to
+# graphical-session.target inside that same session. No second compositor,
+# no background-class session, no seat fight: one session, streamed.
+# The headless chain is:
+# SDDM autologin -> uwsm Hyprland -> SUNSHINE output -> sunshine user unit
+#                                               -> Moonlight -> NetBird (wt0).
 #
 #   ./remote-access-sunshine.sh install [--headless] [--yes]
 #       default: sunshine user unit enabled for the session plus a Hyprland
@@ -26,20 +25,15 @@
 #       started inside it (uwsm-app/autostart scope), so WAYLAND_DISPLAY and
 #       the uwsm activation environment are always present.
 #       --headless: unattended mode for a headless host that is never logged
-#       into locally. No autostart.lua entry (nothing ever starts a desktop
-#       session to fire it). Instead headless Hyprland + sunshine run as
-#       system units as YOU at boot, with your own ~/.config/hypr:
-#         sunshine-headless.service   uwsm-managed Hyprland on a headless
-#                                     output (created at session start,
-#                                     1920x1080), restarted on failure, part
-#                                     of graphical.target
-#         sunshine-streamer.service   sunshine itself (After/Requires the
-#                                     compositor, same XDG_RUNTIME_DIR), also
-#                                     restarted on failure
-#       linger is enabled for your account so the units survive logout.
-#       install modes are exclusive: each run installs its own startup hook
-#       and disables the other one (headless units are stopped/disabled in
-#       desktop mode, the autostart entry is removed in headless mode).
+#       into locally. SDDM autologins you at boot (same posture as an
+#       encrypted install, where LUKS is the auth boundary); the resulting
+#       uwsm Hyprland session IS the stream source -- your hyprland.lua,
+#       your dotfiles, no second compositor. Sunshine runs as a user unit
+#       bound to graphical-session.target; a Hyprland autostart hook creates
+#       the SUNSHINE headless output inside the live session.
+#       install modes are exclusive: desktop mode removes the headless
+#       units + autologin; headless mode removes the desktop autostart entry
+#       (it would double-start sunshine next to the user unit).
 #
 #   ./remote-access-sunshine.sh uninstall [--yes]
 #       remove everything this script's install created, whichever mode was
@@ -62,10 +56,9 @@ Commands:
   uninstall          remove sunshine + every artifact install created
 
 Options for install:
-  --headless         unattended headless mode for a host that is never
-                     logged into locally: uwsm-managed headless Hyprland +
-                     sunshine as system units at boot running as you, with
-                     your own Hyprland config; no autostart entry
+  --headless         unattended headless mode: SDDM autologin at boot,
+                     sunshine as a user unit in your uwsm Hyprland session
+                     (your own Hyprland config); no desktop autostart entry
   --yes, -y          do not ask for confirmation
   -h, --help         show this message
 
@@ -108,23 +101,23 @@ readonly admin_exec="omarchy-launch-webapp $admin_url --ignore-certificate-error
 readonly autostart_file="$HOME/.config/hypr/autostart.lua"
 readonly autostart_entry='o.launch_on_start("sunshine")'
 
-# Headless session identity: the invoking user. The headless stack streams
-# YOUR desktop -- your ~/.config/hypr, your dotfiles, your Sunshine pairing.
-# NOTE: $USER is baked at install time (the account running install), not at
-# boot: systemd has no $USER in system units, so the value is expanded into
-# the unit files below. Re-run install after `su` to a different account if
-# the box changes hands.
+# Headless mode: SDDM autologins the invoking user at boot (same posture as
+# an encrypted install, where LUKS is the auth boundary). The resulting uwsm
+# Hyprland session is Class=user + seat-active, so Aquamarine gets DRM
+# master on the virtio-gpu -- no background-class refusal, no second
+# compositor. Sunshine runs as a user unit inside that session; a Hyprland
+# autostart hook creates the SUNSHINE headless output once the session is up
+# (hyprctl needs a live socket, so nothing at install time can do it).
 readonly headless_user="$USER"
-readonly headless_unit_prefix='sunshine'
-readonly headless_compositor_unit="${headless_unit_prefix}-headless.service"
-readonly headless_streamer_unit="${headless_unit_prefix}-streamer.service"
-readonly headless_runtime_leaf="sunshine-${USER}"
-readonly headless_runtime_dir="/run/${headless_runtime_leaf}"
-readonly headless_output_script='/usr/local/bin/sunshine-headless-output.sh'
-# Single-writer record of the live session: the output helper writes
-# WAYLAND_DISPLAY=<socket> here once the Hyprland socket exists; the
-# streamer reads it via EnvironmentFile=. One ground truth, no guessing.
-readonly headless_session_env_file="${headless_runtime_dir}/session.env"
+readonly headless_output_name='SUNSHINE'
+readonly headless_output_mode='1920x1080@60'
+readonly headless_output_scale=1
+# Autostart hook, loaded by hyprland.lua's require("hypr.autostart") chain
+# (same mechanism as the desktop sunshine entry -- but creating the output
+# instead of launching an app). Separate file so uninstall removes exactly
+# what install added without touching your autostart.lua.
+readonly headless_autostart_hook="$HOME/.config/hypr/autostart-sunshine-headless.lua"
+readonly headless_sddm_conf='/etc/sddm.conf.d/autologin.conf'
 
 command_name="${1:-}"
 case "$command_name" in
@@ -319,49 +312,36 @@ enable_desktop_service() {
   systemctl --user enable --now "$sunshine_unit"
 }
 
-disable_headless_services() {
-  # Desktop mode must not leave the unattended stack running next to the
-  # session instance: two servers would fight over ports and encoders.
-  local unit
-  for unit in "$headless_streamer_unit" "$headless_compositor_unit"; do
-    if systemctl is-enabled --quiet "$unit" 2>/dev/null; then
-      sudo systemctl disable --now "$unit"
-    fi
-  done
+disable_headless_config() {
+  # Desktop mode must not leave headless strays: SDDM stays manual, the
+  # autostart hook goes, the user unit is disabled (it only ever runs
+  # inside the autologin session, so disable --now is session-safe).
+  remove_sddm_autologin
+  remove_headless_autostart_hook
+  systemctl --user disable --now "$sunshine_unit" 2>/dev/null || true
 }
 
 # ------------------------------------------------------------------ headless --
 #
-# Boot stack, as the invoking user ($headless_user):
-#
-#   graphical.target
-#     -> sunshine-headless.service (uwsm-managed Hyprland, headless output,
-#        your own ~/.config/hypr)
-#     -> sunshine-streamer.service (sunshine, After/Requires the compositor)
-#
-# Why uwsm instead of bare `Hyprland`: the desktop session is uwsm-managed
-# (uwsm-app scopes, activation environment, XDG autostart, clean shutdown),
-# and Sunshine's wlr capture inherits WAYLAND_DISPLAY from the uwsm session
-# environment. A bare compositor process outside uwsm would leave sunshine
-# guessing at the socket and skip the session lifecycle the desktop path
-# relies on.
-#
-# Why system units + linger: systemd --user enable --now sunshine solves the
-# "Unit sunshine.service does not exist" alias bug but still starts
-# sunshine with no compositor behind it on a headless boot. The headless
-# compositor must exist first, ordered before the streamer, in the same
-# runtime dir -- which is what these two units express.
+# Candidate A: reuse the SDDM autologin session. SDDM logs you in at boot
+# (Class=user, seat-active -- the two properties the old background-class
+# system units could never get, which is what killed DRM master and crashed
+# Hyprland in a 60s loop). uwsm then starts YOUR Hyprland with YOUR
+# dotfiles; sunshine runs as a user unit bound to graphical-session.target
+# in that same session. One compositor, streamed. No second session, no
+# seat fight, no XDG_RUNTIME_DIR plumbing: user units inherit the session
+# environment (WAYLAND_DISPLAY et al.) from the user manager for free.
+# SDDM autologin here mirrors the encrypted-install posture, where the LUKS
+# passphrase is the auth boundary; on an unencrypted headless box the
+# absence of a disk lock IS the accepted tradeoff.
 
 ensure_headless_prereqs() {
-  # Sunshine drives virtual keyboard/mouse through /dev/uinput, which is
-  # root:input 0660 plus an ACL for the *active* seat user. A headless boot
-  # never activates a seat, so group membership is the only path.
+  # The autologin session is seat-active, so logind grants the session ACLs
+  # on /dev/uinput itself -- but the input group is a cheap fallback for
+  # the window between session start and device probing. Harmless either way.
   if ! id -nG "$headless_user" | tr ' ' '\n' | grep -qx input; then
     info "adding $headless_user to the input group (uinput access)"
     sudo usermod -aG input "$headless_user"
-    note 'group change takes effect at next login; the headless units'
-    note 'start at boot, so this only matters on first install -- reboot'
-    note 'after install if input capture misbehaves'
   else
     note "$headless_user is already in the input group"
   fi
@@ -371,169 +351,107 @@ ensure_headless_session_env() {
   # The headless session IS your desktop session: same ~/.config/hypr
   # (hyprland.lua + your dotfiles), same Sunshine pairing in
   # ~/.config/sunshine. Nothing to stage -- but fail fast when the config
-  # is absent, or boot would land on a fallback compositor.
+  # is absent, or SDDM autologin would land on a fallback compositor.
   if [[ ! -f "$HOME/.config/hypr/hyprland.lua" ]]; then
     die "no ~/.config/hypr/hyprland.lua found; install your dotfiles first"
   fi
   note 'headless session uses your own ~/.config/hypr (hyprland.lua)'
 }
 
-write_headless_output_script() {
-  # Helper the compositor unit ExecStarts: bring up the uwsm session in the
-  # background, wait for the Hyprland socket (hyprctl needs
-  # HYPRLAND_INSTANCE_SIGNATURE, which only exists once Hyprland is up),
-  # then create + configure the SUNSHINE capture output. Idempotent, so
-  # unit restarts re-apply the output instead of failing on a duplicate.
-  # A separate file (not an inline bash -c) because systemd splits
-  # ExecStart on whitespace: quoting a 300-char loop through two parsers
-  # is how quoting bugs are born.
-  info "writing headless output helper $headless_output_script"
-  # Quoted heredoc: the helper's $vars survive to boot time. The one
-  # installer-side value (session.env path) is stamped in via a placeholder
-  # replaced below -- expanding it inline would unquote the whole heredoc
-  # and bake every loop variable empty at install time.
-  sudo tee "$headless_output_script" >/dev/null <<'HELPER_EOF'
-#!/usr/bin/env bash
-# Wait for this session's Hyprland socket, then create the capture output.
-# uwsm stays in the foreground below via wait so systemd tracks this PID
-# and Restart= sees real session failures.
-SESSION_ENV_FILE="__SESSION_ENV_FILE__"
-OUTPUT_NAME="SUNSHINE"
-OUTPUT_MODE="1920x1080@60"
-OUTPUT_SCALE="1"
-
-uwsm start -- hyprland.desktop &
-UWSM_PID=$!
-
-for _ in $(seq 1 60); do
-  # Hyprland socket paths look like $XDG_RUNTIME_DIR/hypr/<sig>/socket.sock
-  # (older builds: .socket.sock). The Wayland display name is NOT in that
-  # path -- it is the compositor's bound socket under $XDG_RUNTIME_DIR
-  # (wayland-0, wayland-1, ...). Probe the newest one: on a headless box
-  # the session compositor is the only writer, so newest == ours.
-  SOCK="$(ls -t "$XDG_RUNTIME_DIR"/wayland-* 2>/dev/null | grep -v '\.lock$' | head -1)"
-  if [[ -n "$SOCK" && -S "$SOCK" ]]; then
-    export WAYLAND_DISPLAY="$(basename "$SOCK")"
-    export HYPRLAND_INSTANCE_SIGNATURE="$(basename "$(dirname "$(ls -t "$XDG_RUNTIME_DIR"/hypr/*/socket.sock "$XDG_RUNTIME_DIR"/hypr/*/.socket.sock 2>/dev/null | head -1)")")"
-    # Record the ground truth for the streamer, which sources this file via
-    # EnvironmentFile=. No hardcoded display name anywhere. Written before
-    # output creation so a hyprctl failure still leaves a correct record.
-    printf 'WAYLAND_DISPLAY=%s\n' "$WAYLAND_DISPLAY" >"$SESSION_ENV_FILE"
-    if hyprctl output create headless "$OUTPUT_NAME" 2>/dev/null || hyprctl monitors all 2>/dev/null | grep -q "$OUTPUT_NAME"; then
-      hyprctl keyword monitor "$OUTPUT_NAME,$OUTPUT_MODE,0x0,$OUTPUT_SCALE"
-      break
-    fi
-  fi
-  sleep 1
-done
-
-wait "$UWSM_PID"
-HELPER_EOF
-  sudo sed -i "s|^SESSION_ENV_FILE=.*|SESSION_ENV_FILE=\"$headless_session_env_file\"|" "$headless_output_script"
-  sudo chmod 0755 "$headless_output_script"
+write_sddm_autologin() {
+  # Permanent autologin (NOT the one-shot omarchy-provision variant, which
+  # deletes itself after first boot). Same file encrypted installs keep
+  # forever; same session name SDDM already remembers for you.
+  info "enabling SDDM autologin for $headless_user"
+  sudo tee "$headless_sddm_conf" >/dev/null <<EOF
+[Autologin]
+User=$headless_user
+Session=omarchy.desktop
+EOF
 }
 
-write_headless_units() {
-  # Tear down any previous revision before writing: stale ExecStart lines
-  # from an older copy must not survive alongside the new ones.
-  disable_headless_services
+remove_sddm_autologin() {
+  if [[ -f "$headless_sddm_conf" ]]; then
+    info "removing SDDM autologin $headless_sddm_conf"
+    sudo rm -f "$headless_sddm_conf"
+  fi
+}
 
-  info "installing headless units $headless_compositor_unit + $headless_streamer_unit"
-
-  # Compositor: uwsm start generates the wayland-session@ set from the
-  # hyprland.desktop entry and blocks until the session exits. No
-  # HYPRLAND_CONFIG override: the session loads YOUR ~/.config/hypr
-  # (hyprland.lua + dotfiles) exactly as a local login would. Restart=always
-  # because a headless box has no greeter to bring the session back; the 5s
-  # delay avoids a tight loop when the GPU/backend is missing entirely.
-  # Quoted heredoc: the unit's remaining $vars belong to systemd at boot,
-  # not to this installer.
-  sudo tee "/etc/systemd/system/$headless_compositor_unit" >/dev/null <<UNIT_EOF
-[Unit]
-Description=Headless Hyprland session for Sunshine streaming (uwsm-managed)
-Documentation=man:uwsm(1)
-After=systemd-user-sessions.service network-online.target
-Wants=network-online.target
-PartOf=graphical.target
-
-[Service]
-Type=simple
-User=$headless_user
-PAMName=login
-# render/video for the DRM node, input as a fallback if the seat ACL misses.
-SupplementaryGroups=render video input
-Environment=XDG_RUNTIME_DIR=$headless_runtime_dir
-# Headless boot has no login VT, so the DRM backend would refuse master.
-# These two hand it a VT to own (mirrors loginctl seat behaviour).
-Environment=XDG_SEAT=seat0
-Environment=XDG_VTNR=8
-RuntimeDirectory=$headless_runtime_leaf
-ExecStartPre=/usr/bin/install -d -o $headless_user -g $headless_user -m 0700 $headless_runtime_dir
-# Helper below backgrounds uwsm, waits for the Hyprland socket, creates the
-# SUNSHINE headless output, then waits on the session (foreground PID, so
-# Restart= tracks real session failures).
-ExecStart=$headless_output_script
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=graphical.target
-UNIT_EOF
-
-  # Streamer: sunshine bound to the compositor above. After= orders startup;
-  # Requires=/BindsTo stops the streamer if the compositor dies so Restart=
-  # converges instead of sunshine capturing a dead socket (BindsTo carries
-  # lifecycle only -- no environment crosses that edge).
-  # XDG_RUNTIME_DIR must match the compositor: the Wayland socket lives there.
-  # WAYLAND_DISPLAY arrives via EnvironmentFile=, written by the output
-  # helper once the live socket exists (normally wayland-0, wayland-1+ when
-  # a stale socket lingers). The leading `-` tolerates first boot before the
-  # helper's first write; Restart=always then retries into the corrected
-  # file within seconds instead of parking a dead unit.
-  # Your pairing lives in ~/.config/sunshine either way (same user now),
-  # so pair once over the admin webapp and both modes share it.
-  # capture/output_name pin the stream to the SUNSHINE headless output:
-  # output_name=1 is the capture-time index (the connector name is what
-  # Sunshine's capture enumeration has historically filtered out; #5087).
-  # Passed as CLI overrides so a stray sunshine.conf value cannot shadow
-  # them.
-  sudo tee "/etc/systemd/system/$headless_streamer_unit" >/dev/null <<EOF
-[Unit]
-Description=Sunshine game stream host (headless, bound to headless Hyprland)
-Documentation=https://app.lizardbyte.dev/Sunshine
-After=$headless_compositor_unit
-Requires=$headless_compositor_unit
-BindsTo=$headless_compositor_unit
-PartOf=graphical.target
-
-[Service]
-Type=simple
-User=$headless_user
-PAMName=login
-# Same device story as the compositor: encoder + uinput access.
-SupplementaryGroups=render video input
-Environment=XDG_RUNTIME_DIR=$headless_runtime_dir
-EnvironmentFile=-$headless_session_env_file
-ExecStartPre=/usr/bin/install -d -o $headless_user -g $headless_user -m 0700 $headless_runtime_dir
-ExecStart=/usr/bin/sunshine capture=wlr output_name=1
-Restart=always
-RestartSec=2
-
-[Install]
-WantedBy=graphical.target
+write_headless_autostart_hook() {
+  # Runs inside the live Hyprland session: hyprland.lua's
+  # require("hypr.autostart") chain loads ~/.config/hypr/autostart.lua, and
+  # install appends a require of this hook file there -- so hyprctl needs no
+  # socket hunt, no HYPRLAND_INSTANCE_SIGNATURE derivation, no poll loop.
+  # The compositor is up by definition when this fires. Idempotent
+  # create-or-reuse: a session restart re-applies the output instead of
+  # failing on a duplicate.
+  info "writing headless output hook $headless_autostart_hook"
+  cat >"$headless_autostart_hook" <<EOF
+-- Headless SUNSHINE output for Sunshine streaming.
+-- Written by scripts/remote-access-sunshine.sh (install --headless).
+-- Required from autostart.lua; runs once the session is live.
+hl.on("hyprland.start", function()
+  hl.exec_cmd("hyprctl output create headless $headless_output_name || true; hyprctl keyword monitor \"$headless_output_name,$headless_output_mode,0x0,$headless_output_scale\"")
+end)
 EOF
+  if ! grep -Fq 'require("hypr.autostart-sunshine-headless")' "$autostart_file" 2>/dev/null; then
+    printf '\nrequire("hypr.autostart-sunshine-headless")\n' >>"$autostart_file"
+  fi
+}
 
-  sudo systemctl daemon-reload
+remove_headless_autostart_hook() {
+  if [[ -f "$headless_autostart_hook" ]]; then
+    info "removing headless output hook $headless_autostart_hook"
+    rm -f "$headless_autostart_hook"
+  fi
+  # Remove only the require line install added; your entries stay untouched.
+  if [[ -f $autostart_file ]]; then
+    sed -i '/^require("hypr\.autostart-sunshine-headless")$/d' "$autostart_file"
+  fi
+}
+
+enable_headless_sunshine_unit() {
+  # The packaged unit is WantedBy=graphical-session.target only -- which is
+  # exactly right here: inside the autologin session that target goes
+  # active, the user manager starts the unit with the full session
+  # environment (WAYLAND_DISPLAY et al.) for free. No XDG_RUNTIME_DIR
+  # plumbing, no session.env file, no socket guessing.
+  # Addressed by real unit name: the package ships no literal
+  # sunshine.service file, only an Alias= written by enable itself.
+  # capture/output_name pin the stream to the SUNSHINE headless output via
+  # a drop-in override (not CLI -- user units have no CLI): output_name=1
+  # is the capture-time index (the connector name is what Sunshine's
+  # capture enumeration has historically filtered out; #5087). A drop-in
+  # keeps the packaged unit file pristine across upgrades.
+  info "enabling sunshine user unit for the autologin session"
+  mkdir -p "$HOME/.config/systemd/user/${sunshine_unit}.d"
+  cat >"$HOME/.config/systemd/user/${sunshine_unit}.d/10-headless-capture.conf" <<EOF
+# Written by scripts/remote-access-sunshine.sh (install --headless).
+# Pin capture to the SUNSHINE headless output created by the autostart hook.
+[Service]
+ExecStart=
+ExecStart=/usr/bin/sunshine capture=wlr output_name=1
+EOF
+  systemctl --user daemon-reload
+  systemctl --user enable --now "$sunshine_unit"
+}
+
+remove_headless_sunshine_override() {
+  local dropin="$HOME/.config/systemd/user/${sunshine_unit}.d/10-headless-capture.conf"
+  if [[ -f "$dropin" ]]; then
+    info 'removing sunshine headless capture drop-in'
+    rm -f "$dropin"
+    rmdir "$HOME/.config/systemd/user/${sunshine_unit}.d" 2>/dev/null || true
+    systemctl --user daemon-reload 2>/dev/null || true
+  fi
 }
 
 enable_headless_service() {
   ensure_headless_prereqs
   ensure_headless_session_env
-  write_headless_output_script
-  write_headless_units
-
-  sudo systemctl enable --now "$headless_compositor_unit"
-  sudo systemctl enable --now "$headless_streamer_unit"
+  write_sddm_autologin
+  write_headless_autostart_hook
+  enable_headless_sunshine_unit
 
   if [[ "$(loginctl show-user "$headless_user" --property=Linger --value 2>/dev/null)" != yes ]]; then
     info "enabling linger for $headless_user"
@@ -543,8 +461,8 @@ enable_headless_service() {
   fi
 
   note "capture output $headless_output_name ($headless_output_mode) is created"
-  note 'by the compositor unit at session start; sunshine captures it via'
-  note 'capture=wlr output_name=1'
+  note 'by the Hyprland autostart hook at session start; sunshine runs as a'
+  note 'user unit with the session environment (no display guessing)'
 }
 # ----------------------------------------------------------------- uninstall --
 #
@@ -564,27 +482,31 @@ disable_desktop_service() {
 }
 
 remove_headless_units() {
+  # Legacy only: pre-candidate-A installs wrote system units + a helper
+  # script. Candidate A owns no system files, so on a fresh host this finds
+  # nothing; on a previously-tested host it sweeps the old stack so the
+  # autologin session is the only compositor.
   local unit
-  for unit in "$headless_streamer_unit" "$headless_compositor_unit"; do
+  for unit in sunshine-streamer.service sunshine-headless.service; do
     if systemctl is-active --quiet "$unit" 2>/dev/null; then
-      info "stopping $unit"
+      info "stopping legacy $unit"
       sudo systemctl stop "$unit"
     fi
     if systemctl is-enabled --quiet "$unit" 2>/dev/null; then
-      info "disabling $unit"
+      info "disabling legacy $unit"
       sudo systemctl disable "$unit"
     fi
     if [[ -f "/etc/systemd/system/$unit" ]]; then
-      info "removing /etc/systemd/system/$unit"
+      info "removing legacy /etc/systemd/system/$unit"
       sudo rm -f "/etc/systemd/system/$unit"
     fi
   done
-  if [[ -f "$headless_output_script" ]]; then
-    info "removing $headless_output_script"
-    sudo rm -f "$headless_output_script"
+  if [[ -f '/usr/local/bin/sunshine-headless-output.sh' ]]; then
+    info 'removing legacy /usr/local/bin/sunshine-headless-output.sh'
+    sudo rm -f '/usr/local/bin/sunshine-headless-output.sh'
   fi
-  sudo systemctl daemon-reload
-  sudo systemctl reset-failed "$headless_streamer_unit" "$headless_compositor_unit" 2>/dev/null || true
+  sudo systemctl daemon-reload 2>/dev/null || true
+  sudo systemctl reset-failed sunshine-streamer.service sunshine-headless.service 2>/dev/null || true
 }
 
 remove_admin_webapp() {
@@ -649,13 +571,18 @@ remove_sunshine_package() {
 
 cmd_uninstall() {
   printf 'This will remove sunshine and every artifact install created:\n'
-  printf 'headless system units (if present), desktop user unit + autostart\n'
-  printf 'entry, admin webapp, UFW rules, and the sunshine package.\n'
+  printf 'SDDM autologin, headless autostart hook, sunshine user unit,\n'
+  printf 'desktop autostart entry, admin webapp, UFW rules, and the package.\n'
   printf 'Your account and dotfiles are untouched.\n'
   confirm
 
-  info 'removing headless system units (if present)'
+  info 'removing legacy headless system units (if present)'
   remove_headless_units
+
+  info 'removing SDDM autologin + headless autostart hook'
+  remove_sddm_autologin
+  remove_headless_autostart_hook
+  remove_headless_sunshine_override
 
   info 'removing desktop user unit + Hyprland autostart entry'
   disable_desktop_service
@@ -677,8 +604,10 @@ cmd_uninstall() {
 
 cmd_install() {
   if ((headless)); then
-    printf 'This will install %s, open its streaming ports, and run headless\n' "$sunshine_pkg"
-    printf 'Hyprland (uwsm-managed) plus sunshine as system units at boot (no Hyprland autostart entry).\n'
+    printf 'This will install %s, open its streaming ports, and set up\n' "$sunshine_pkg"
+    printf 'unattended streaming: SDDM autologin at boot into your Hyprland\n'
+    printf 'session (your own config), SUNSHINE output via autostart hook,\n'
+    printf 'sunshine as a user unit inside that session.\n'
   else
     printf 'This will install %s, open its streaming ports, and start it for\n' "$sunshine_pkg"
     printf 'your Hyprland session (user service + autostart entry).\n'
@@ -695,17 +624,17 @@ cmd_install() {
   install_admin_webapp
 
   if ((headless)); then
-    info 'enabling headless Sunshine stack (removing any Hyprland autostart entry)'
+    info 'enabling headless streaming (removing any desktop autostart entry)'
     disable_hyprland_autostart
     enable_headless_service
     note 'admin UI has been installed but not launched; open it after pairing:'
     note "  $admin_url (self-signed certificate warning is expected)"
-    note 'stack: Hyprland -> Moonlight (Sunshine) -> NetBird (wt0), as system'
-    note "units as $headless_user with your own Hyprland config, at boot via"
-    note 'graphical.target'
+    note 'chain: SDDM autologin -> your Hyprland -> SUNSHINE output ->'
+    note 'sunshine user unit -> Moonlight over NetBird (wt0)'
+    note 'reboot to verify: no password prompt, session starts on its own'
   else
     info 'enabling Sunshine for this Hyprland session'
-    disable_headless_services
+    disable_headless_config
     enable_desktop_service
     enable_hyprland_autostart
     if command -v omarchy-launch-webapp >/dev/null 2>&1; then
@@ -716,7 +645,7 @@ cmd_install() {
 
   printf '\n'
   if ((headless)); then
-    info 'Sunshine is installed from [lizardbyte] and streams from headless Hyprland at boot; Moonlight ports are open for private LANs, tailscale0 and wt0.'
+    info 'Sunshine is installed from [lizardbyte] and streams your autologin Hyprland session at boot; Moonlight ports are open for private LANs, tailscale0 and wt0.'
   else
     info 'Sunshine is installed from [lizardbyte] with Moonlight ports open for private LANs, tailscale0 and wt0.'
   fi
