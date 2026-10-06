@@ -118,6 +118,7 @@ readonly headless_output_scale=1
 # what install added without touching your autostart.lua.
 readonly headless_autostart_hook="$HOME/.config/hypr/autostart-sunshine-headless.lua"
 readonly headless_disable_physicals="$HOME/.config/hypr/sunshine-disable-physicals.sh"
+readonly headless_sddm_conf='/etc/sddm.conf.d/autologin.conf'
 
 command_name="${1:-}"
 case "$command_name" in
