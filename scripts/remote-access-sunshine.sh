@@ -398,6 +398,10 @@ write_headless_autostart_hook() {
   # install appends a require of this hook file there -- so hyprctl needs no
   # socket hunt, no HYPRLAND_INSTANCE_SIGNATURE derivation, no poll loop.
   # The compositor is up by definition when this fires.
+  # Everything below uses the native Lua monitor API (hl.monitor): the legacy
+  # `hyprctl keyword monitor` string syntax died with the 0.55 Lua migration
+  # ("keyword can't work with non-legacy parsers"), which is why every prior
+  # revision silently configured nothing. Native calls fail loudly instead.
   # Single-output session: SUNSHINE is created at the pinned mode/scale and
   # every physical output is disabled. Sunshine's wlr enumeration has
   # historically filtered HEADLESS connectors at capture time (#5087) -- on
@@ -415,11 +419,18 @@ write_headless_autostart_hook() {
 -- Written by scripts/remote-access-sunshine.sh (install --headless).
 -- Required from autostart.lua; runs once the session is live.
 -- Delegates to the gated helper: no-op unless sddm-autologin session.
+-- Native Lua monitor API throughout: `hyprctl keyword monitor` is dead
+-- since the 0.55 Lua migration and silently configures nothing.
 hl.on("hyprland.start", function()
   -- Gated helper: no-op unless this is the sddm-autologin session.
+  -- Helper script avoids shell-in-Lua quoting entirely.
   hl.exec_cmd("sh $headless_disable_physicals")
 end)
 EOF
+  # Gate lives in shell (logind Service check needs a subprocess either
+  # way); topology itself goes through `hyprctl eval` with Lua monitor
+  # calls -- the only CLI path that speaks the post-0.55 config language.
+  # hyprctl monitors -j stays: JSON listing was never legacy syntax.
   cat >"$headless_disable_physicals" <<'DISABLE_EOF'
 #!/bin/sh
 # Single-output surgery for the autologin headless session ONLY.
@@ -437,12 +448,12 @@ if [ "$(loginctl show-session "${XDG_SESSION_ID:-}" -p Service --value 2>/dev/nu
 fi
 # SUNSHINE at pinned mode/scale; create-or-reuse so restarts re-apply.
 hyprctl output create headless "__OUTPUT__" || true
-hyprctl keyword monitor "__OUTPUT__,__MODE__,0x0,__SCALE__"
+hyprctl eval 'hl.monitor({ output = "__OUTPUT__", mode = "__MODE__", position = "0x0", scale = __SCALE__ })'
 # Sleep so the mode set lands before the topology change.
 sleep 1
 hyprctl monitors -j | jq -r --arg keep "__OUTPUT__" '.[] | select(.name != $keep) | .name' |
   while IFS= read -r mon; do
-    [ -n "$mon" ] && hyprctl keyword monitor "$mon,disable"
+    [ -n "$mon" ] && hyprctl eval "hl.monitor({ output = \"$mon\", disabled = true })"
   done
 # Restart sunshine so its single-shot startup enumeration sees exactly one
 # output (index 0 == SUNSHINE).
