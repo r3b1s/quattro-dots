@@ -340,13 +340,20 @@ ensure_headless_prereqs() {
   # The autologin session is seat-active, so logind grants the session ACLs
   # on /dev/uinput itself -- but the input group is a cheap fallback for
   # the window between session start and device probing. Harmless either way.
-  if ! id -nG "$headless_user" | tr ' ' '\n' | grep -qx input; then
-    info "adding $headless_user to the input group (uinput access)"
-    sudo usermod -aG input "$headless_user"
-  else
-    note "$headless_user is already in the input group"
-  fi
-
+  # video/render cover the DRM nodes (/dev/dri/card*, renderD*) for the
+  # encoder's dumb-buffer/GBM allocation: the seat ACL grants card1, but
+  # KMS dumb-create needs more than an open fd on some paths, and group
+  # membership persists regardless of ACL timing. Needs a re-login (or the
+  # post-install reboot, which headless needs anyway) to take effect.
+  local group
+  for group in input video render; do
+    if ! id -nG "$headless_user" | tr ' ' '\n' | grep -qx "$group"; then
+      info "adding $headless_user to the $group group"
+      sudo usermod -aG "$group" "$headless_user"
+    else
+      note "$headless_user is already in the $group group"
+    fi
+  done
   # The disable-physicals helper parses `hyprctl monitors -j`. jq ships on
   # omarchy desktops, but headless-first installs must not assume it.
   if ! command -v jq >/dev/null 2>&1; then
