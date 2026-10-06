@@ -401,38 +401,46 @@ write_headless_autostart_hook() {
   # Scale is pinned to 1 explicitly: desktop monitor configs (omarchy scale
   # 1.25+, observed 2x on SUNSHINE) otherwise inflate the framebuffer
   # (1920x1080 logical -> 3840x2160 captured) and burn encoder for nothing.
-  # Idempotent: re-running on session restart re-applies instead of failing.
   info "writing headless output hook $headless_autostart_hook"
   cat >"$headless_autostart_hook" <<EOF
 -- Headless SUNSHINE output for Sunshine streaming.
 -- Written by scripts/remote-access-sunshine.sh (install --headless).
 -- Required from autostart.lua; runs once the session is live.
--- Single-output session: physicals off, SUNSHINE at pinned mode/scale.
+-- Delegates to the gated helper: no-op unless sddm-autologin session.
 hl.on("hyprland.start", function()
-  -- SUNSHINE at pinned mode/scale; create-or-reuse so restarts re-apply.
-  hl.exec_cmd("hyprctl output create headless $headless_output_name || true")
-  hl.exec_cmd("hyprctl keyword monitor \"$headless_output_name,$headless_output_mode,0x0,$headless_output_scale\"")
-  -- Single-output session: physicals off, then restart sunshine so its
-  -- startup enumeration sees exactly one output (index 0 == SUNSHINE).
-  -- Helper script avoids triple-nested quoting (lua > shell > jq filter).
+  -- Gated helper: no-op unless this is the sddm-autologin session.
   hl.exec_cmd("sh $headless_disable_physicals")
 end)
 EOF
   cat >"$headless_disable_physicals" <<'DISABLE_EOF'
 #!/bin/sh
-# Disable every output except SUNSHINE, then restart sunshine so its
-# single-shot startup enumeration sees exactly one output.
-# Invoked from the Hyprland autostart hook; sleeps so the SUNSHINE mode
-# set above lands before the topology change.
+# Single-output surgery for the autologin headless session ONLY.
+# Invoked from the Hyprland autostart hook, which fires in EVERY session
+# (autologin boot and manual password login alike). The gate below checks
+# the session's logind Service: sddm-autologin means unattended boot --
+# reshape topology. Anything else (sddm manual login, ssh, existing
+# desktop) leaves all outputs alone: disabling a human's only physical
+# output is how you get a black screen with a valid stream.
+# Gate runs first, before any output exists: on a manual login nothing is
+# created, nothing disabled, sunshine keeps capturing the physical.
 set -eu
+if [ "$(loginctl show-session "${XDG_SESSION_ID:-}" -p Service --value 2>/dev/null)" != "sddm-autologin" ]; then
+  exit 0
+fi
+# SUNSHINE at pinned mode/scale; create-or-reuse so restarts re-apply.
+hyprctl output create headless "__OUTPUT__" || true
+hyprctl keyword monitor "__OUTPUT__,__MODE__,0x0,__SCALE__"
+# Sleep so the mode set lands before the topology change.
 sleep 1
 hyprctl monitors -j | jq -r --arg keep "__OUTPUT__" '.[] | select(.name != $keep) | .name' |
   while IFS= read -r mon; do
     [ -n "$mon" ] && hyprctl keyword monitor "$mon,disable"
   done
+# Restart sunshine so its single-shot startup enumeration sees exactly one
+# output (index 0 == SUNSHINE).
 systemctl --user try-restart __UNIT__ || true
 DISABLE_EOF
-  sed -i -e "s/__OUTPUT__/$headless_output_name/" -e "s/__UNIT__/$sunshine_unit/" "$headless_disable_physicals"
+  sed -i -e "s/__OUTPUT__/$headless_output_name/g" -e "s/__MODE__/$headless_output_mode/" -e "s/__SCALE__/$headless_output_scale/" -e "s/__UNIT__/$sunshine_unit/" "$headless_disable_physicals"
   chmod +x "$headless_disable_physicals"
   if ! grep -Fq 'require("hypr.autostart-sunshine-headless")' "$autostart_file" 2>/dev/null; then
     printf '\nrequire("hypr.autostart-sunshine-headless")\n' >>"$autostart_file"
