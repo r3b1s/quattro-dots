@@ -117,7 +117,7 @@ readonly headless_output_scale=1
 # instead of launching an app). Separate file so uninstall removes exactly
 # what install added without touching your autostart.lua.
 readonly headless_autostart_hook="$HOME/.config/hypr/autostart-sunshine-headless.lua"
-readonly headless_sddm_conf='/etc/sddm.conf.d/autologin.conf'
+readonly headless_disable_physicals="$HOME/.config/hypr/sunshine-disable-physicals.sh"
 
 command_name="${1:-}"
 case "$command_name" in
@@ -345,6 +345,13 @@ ensure_headless_prereqs() {
   else
     note "$headless_user is already in the input group"
   fi
+
+  # The disable-physicals helper parses `hyprctl monitors -j`. jq ships on
+  # omarchy desktops, but headless-first installs must not assume it.
+  if ! command -v jq >/dev/null 2>&1; then
+    info 'installing jq (headless output topology helper)'
+    sudo pacman -S --needed --noconfirm jq
+  fi
 }
 
 ensure_headless_session_env() {
@@ -382,18 +389,51 @@ write_headless_autostart_hook() {
   # require("hypr.autostart") chain loads ~/.config/hypr/autostart.lua, and
   # install appends a require of this hook file there -- so hyprctl needs no
   # socket hunt, no HYPRLAND_INSTANCE_SIGNATURE derivation, no poll loop.
-  # The compositor is up by definition when this fires. Idempotent
-  # create-or-reuse: a session restart re-applies the output instead of
-  # failing on a duplicate.
+  # The compositor is up by definition when this fires.
+  # Single-output session: SUNSHINE is created at the pinned mode/scale and
+  # every physical output is disabled. Sunshine's wlr enumeration has
+  # historically filtered HEADLESS connectors at capture time (#5087) -- on
+  # this virtio-gpu box SUNSHINE never appears in ANY enumeration, so index
+  # pinning alone captures Virtual-1 by fallback and streams a mode the
+  # client never asked for (black screen -> artifact soup). With Virtual-1
+  # disabled the session has exactly one output: index 0 IS SUNSHINE, and
+  # even the fallback captures correctly.
+  # Scale is pinned to 1 explicitly: desktop monitor configs (omarchy scale
+  # 1.25+, observed 2x on SUNSHINE) otherwise inflate the framebuffer
+  # (1920x1080 logical -> 3840x2160 captured) and burn encoder for nothing.
+  # Idempotent: re-running on session restart re-applies instead of failing.
   info "writing headless output hook $headless_autostart_hook"
   cat >"$headless_autostart_hook" <<EOF
 -- Headless SUNSHINE output for Sunshine streaming.
 -- Written by scripts/remote-access-sunshine.sh (install --headless).
 -- Required from autostart.lua; runs once the session is live.
+-- Single-output session: physicals off, SUNSHINE at pinned mode/scale.
 hl.on("hyprland.start", function()
-  hl.exec_cmd("hyprctl output create headless $headless_output_name || true; hyprctl keyword monitor \"$headless_output_name,$headless_output_mode,0x0,$headless_output_scale\"")
+  -- SUNSHINE at pinned mode/scale; create-or-reuse so restarts re-apply.
+  hl.exec_cmd("hyprctl output create headless $headless_output_name || true")
+  hl.exec_cmd("hyprctl keyword monitor \"$headless_output_name,$headless_output_mode,0x0,$headless_output_scale\"")
+  -- Single-output session: physicals off, then restart sunshine so its
+  -- startup enumeration sees exactly one output (index 0 == SUNSHINE).
+  -- Helper script avoids triple-nested quoting (lua > shell > jq filter).
+  hl.exec_cmd("sh $headless_disable_physicals")
 end)
 EOF
+  cat >"$headless_disable_physicals" <<'DISABLE_EOF'
+#!/bin/sh
+# Disable every output except SUNSHINE, then restart sunshine so its
+# single-shot startup enumeration sees exactly one output.
+# Invoked from the Hyprland autostart hook; sleeps so the SUNSHINE mode
+# set above lands before the topology change.
+set -eu
+sleep 1
+hyprctl monitors -j | jq -r --arg keep "__OUTPUT__" '.[] | select(.name != $keep) | .name' |
+  while IFS= read -r mon; do
+    [ -n "$mon" ] && hyprctl keyword monitor "$mon,disable"
+  done
+systemctl --user try-restart __UNIT__ || true
+DISABLE_EOF
+  sed -i -e "s/__OUTPUT__/$headless_output_name/" -e "s/__UNIT__/$sunshine_unit/" "$headless_disable_physicals"
+  chmod +x "$headless_disable_physicals"
   if ! grep -Fq 'require("hypr.autostart-sunshine-headless")' "$autostart_file" 2>/dev/null; then
     printf '\nrequire("hypr.autostart-sunshine-headless")\n' >>"$autostart_file"
   fi
@@ -403,6 +443,10 @@ remove_headless_autostart_hook() {
   if [[ -f "$headless_autostart_hook" ]]; then
     info "removing headless output hook $headless_autostart_hook"
     rm -f "$headless_autostart_hook"
+  fi
+  if [[ -f "$headless_disable_physicals" ]]; then
+    info "removing headless physicals helper $headless_disable_physicals"
+    rm -f "$headless_disable_physicals"
   fi
   # Remove only the require line install added; your entries stay untouched.
   if [[ -f $autostart_file ]]; then
@@ -419,18 +463,21 @@ enable_headless_sunshine_unit() {
   # Addressed by real unit name: the package ships no literal
   # sunshine.service file, only an Alias= written by enable itself.
   # capture/output_name pin the stream to the SUNSHINE headless output via
-  # a drop-in override (not CLI -- user units have no CLI): output_name=1
-  # is the capture-time index (the connector name is what Sunshine's
-  # capture enumeration has historically filtered out; #5087). A drop-in
+  # a drop-in override (CLI impossible on user units): output_name=0, the
+  # first and -- after the hook disables the physicals -- ONLY output. The
+  # connector name is unusable (Sunshine's capture enumeration filters
+  # HEADLESS connectors; #5087 -- on virtio-gpu SUNSHINE appears in none of
+  # its enumerations, so name matching falls back to Virtual-1). A drop-in
   # keeps the packaged unit file pristine across upgrades.
   info "enabling sunshine user unit for the autologin session"
   mkdir -p "$HOME/.config/systemd/user/${sunshine_unit}.d"
   cat >"$HOME/.config/systemd/user/${sunshine_unit}.d/10-headless-capture.conf" <<EOF
 # Written by scripts/remote-access-sunshine.sh (install --headless).
-# Pin capture to the SUNSHINE headless output created by the autostart hook.
+# Pin capture to the SUNSHINE headless output (sole output after the
+# autostart hook disables physicals, so index 0 is always right).
 [Service]
 ExecStart=
-ExecStart=/usr/bin/sunshine capture=wlr output_name=1
+ExecStart=/usr/bin/sunshine capture=wlr output_name=0
 EOF
   systemctl --user daemon-reload
   systemctl --user enable --now "$sunshine_unit"
