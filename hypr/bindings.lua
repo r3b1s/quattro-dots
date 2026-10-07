@@ -1033,13 +1033,13 @@ scratchpad("SUPER + CTRL + P", "sup_ctl_p", uwsmLaunch .. " keepassxc")
 
 local launchWebapp = "omarchy-launch-webapp"
 
--- Omarchy's stock SUPER + A is "select all"; this layer gives the combo to
--- the default browser instead.
+-- Omarchy's stock SUPER + A is "select all"; this layer uses the combo for
+-- the sup_a special workspace instead.
 unbindAll({
   "SUPER + A",
   "SUPER + " .. key.a,
 })
-exec("SUPER + A", omarchyLaunchBrowser, "Browser")
+scratchpad("SUPER + A", "sup_a", nil)
 
 -- Dictionary.
 unbindAll({
