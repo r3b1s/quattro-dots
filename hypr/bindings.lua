@@ -2,6 +2,50 @@
 -- Loaded by hypr/hyprland.lua after hypr/unbindings.lua and before
 -- hypr/layout-specific-bindings.lua.
 
+local scratchpad_prefix = "Scratchpad:"
+
+local function special(name, options)
+  options = options or {}
+  local rule = { workspace = "special:" .. name }
+  if options.layout then
+    rule.layout = options.layout
+  end
+  if options.layout_opts then
+    rule.layout_opts = options.layout_opts
+  end
+  if options.on_created_empty then
+    rule.on_created_empty = options.on_created_empty
+  end
+  hl.workspace_rule(rule)
+end
+
+local function toggle_special(keys, name, description)
+  o.bind(keys, description or (scratchpad_prefix .. " " .. name), hl.dsp.workspace.toggle_special(name))
+end
+
+local function move_to_special(keys, name, description)
+  o.bind(
+    keys,
+    description or ("Move to " .. scratchpad_prefix .. " " .. name),
+    hl.dsp.window.move({ workspace = "special:" .. name })
+  )
+end
+
+local function scratchpad(keys, name, command, opts)
+  opts = opts or {}
+  special(name, {
+    layout = opts.layout,
+    layout_opts = opts.layout_opts,
+    on_created_empty = command,
+  })
+
+  toggle_special(keys, name, opts.description or (scratchpad_prefix .. " " .. name))
+
+  if opts.move_keys then
+    move_to_special(opts.move_keys, name, opts.move_description or ("Move to " .. scratchpad_prefix .. " " .. name))
+  end
+end
+
 local function resize_step(axis)
   local mon = hl.get_active_monitor()
   local dim = mon and tonumber(mon[axis]) or (axis == "width" and 1920 or 1080)
@@ -67,6 +111,43 @@ o.bind(
 o.bind("SUPER + SHIFT + E", "File manager", { omarchy = "nautilus" })
 o.bind("SUPER + SHIFT + ALT + E", "File manager (cwd)", { omarchy = "nautilus-cwd" })
 
--- ── Relocated Omarchy Utilities ────────────────────────────────────────────
+-- ── Relocated Omarchy Utilities & Monitor Scaling ──────────────────────────
 o.bind("SUPER + SHIFT + CTRL + ALT + K", "Show key bindings", "omarchy-menu-keybindings")
 o.bind("SUPER + ALT + Backspace", "Cycle workspace layout", "omarchy-hyprland-workspace-layout-toggle")
+o.bind("SUPER + SHIFT + ALT + equal", "Monitor scaling down", "omarchy-hyprland-monitor-scaling down")
+
+-- ── Empty / Utility Special Workspaces (Scratchpads) ───────────────────────
+scratchpad("SUPER + A", "a", nil, { move_keys = "SUPER + SHIFT + CTRL + A" })
+scratchpad("SUPER + Q", "q", nil, { move_keys = "SUPER + SHIFT + CTRL + Q" })
+scratchpad("SUPER + Y", "y", nil, { move_keys = "SUPER + SHIFT + CTRL + Y" })
+scratchpad("SUPER + U", "u", nil, { move_keys = "SUPER + SHIFT + CTRL + U" })
+
+-- ── Application-Spawning Special Workspaces ────────────────────────────────
+-- Signal
+scratchpad("SUPER + comma", "comma", o.launch("signal-desktop"), { move_keys = "SUPER + SHIFT + CTRL + comma" })
+
+-- Discord (Vesktop) — keep transient loading window and main window in special:slash
+hl.window_rule({
+  match = { class = "^(vesktop)$" },
+  workspace = "special:slash",
+})
+scratchpad(
+  "SUPER + SLASH",
+  "slash",
+  o.launch("vesktop --ozone-platform-hint=auto"),
+  { move_keys = "SUPER + SHIFT + CTRL + SLASH" }
+)
+
+-- Moonlight — keep native Moonlight windows in special:ctl_m
+hl.window_rule({
+  match = { class = "^(com\\.moonlight_stream\\.Moonlight)$" },
+  workspace = "special:ctl_m",
+})
+scratchpad("SUPER + CTRL + M", "ctl_m", o.launch("moonlight"))
+
+-- OneLook Thesaurus webapp
+scratchpad("SUPER + I", "i", 'omarchy-launch-webapp "https://www.onelook.com/thesaurus"')
+
+-- ── Direct Web App Launches ────────────────────────────────────────────────
+o.bind("SUPER + E", "Proton Mail", { webapp = "https://mail.proton.me" })
+o.bind("SUPER + equal", "Proton Calendar", { webapp = "https://calendar.proton.me" })

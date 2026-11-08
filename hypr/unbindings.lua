@@ -1,5 +1,5 @@
 -- Dedicated unbindings for built-in Omarchy 4.5 shortcuts.
--- Loaded first by hypr/bindings.lua directly after default.hypr.omarchy,
+-- Loaded by hypr/hyprland.lua directly after default.hypr.omarchy,
 -- before personal overlay bindings and conditional layout-specific bindings.
 
 -- ── Preinstalled Web App Bindings (default/hypr/bindings/applications.lua) ──
@@ -20,22 +20,41 @@ for _, chord in ipairs({
   hl.unbind(chord)
 end
 
--- ── Displaced Tiling, Layout & Scratchpad Bindings (default/hypr/bindings/tiling.lua) ──
+-- ── Displaced Tiling, Layout, Resize & Scaling Bindings (default/hypr/bindings/tiling.lua) ──
 for _, chord in ipairs({
-  "SUPER + J",       -- Toggle window split (rebound to Move focus down)
-  "SUPER + L",       -- Cycle workspace layout (relocated to SUPER + ALT + Backspace; rebound to Move focus right)
-  "SUPER + ALT + L", -- Cycle workspace layout back (retired in favor of one-way cycling)
-  "SUPER + S",       -- Toggle scratchpad (used by master layout swapwithmaster)
-  "SUPER + ALT + S", -- Move window to scratchpad (retired)
-  "SUPER + F",       -- Full screen (rebound to Maximize active window)
-  "SUPER + CTRL + F",-- Tiled full screen (rebound to In-client fullscreen)
-  "SUPER + ALT + F", -- Full width (rebound to Typical fullscreen)
+  "SUPER + Q",                        -- Close window (rebound to special:q)
+  "SUPER + J",                        -- Toggle window split (rebound to Move focus down)
+  "SUPER + L",                        -- Cycle workspace layout (relocated to SUPER + ALT + Backspace; rebound to Move focus right)
+  "SUPER + ALT + L",                  -- Cycle workspace layout back (retired in favor of one-way cycling)
+  "SUPER + S",                        -- Toggle scratchpad (used by master layout swapwithmaster)
+  "SUPER + ALT + S",                  -- Move window to scratchpad (retired)
+  "SUPER + F",                        -- Full screen (rebound to Maximize active window)
+  "SUPER + CTRL + F",                 -- Tiled full screen (rebound to In-client fullscreen)
+  "SUPER + ALT + F",                  -- Full width (rebound to Typical fullscreen)
+  "SUPER + code:20",                  -- Expand window left (Minus)
+  "SUPER + SHIFT + code:20",          -- Shrink window up (Minus)
+  "SUPER + ALT + code:20",            -- Expand window left a little (Minus)
+  "SUPER + SHIFT + ALT + code:20",    -- Shrink window up a little (Minus)
+  "SUPER + CTRL + code:20",           -- Expand window left a lot (Minus)
+  "SUPER + CTRL + SHIFT + code:20",   -- Shrink window up a lot (Minus)
+  "SUPER + code:21",                  -- Shrink window left (Equal; rebound to Proton Calendar)
+  "SUPER + SHIFT + code:21",          -- Expand window down (Equal)
+  "SUPER + ALT + code:21",            -- Shrink window left a little (Equal)
+  "SUPER + SHIFT + ALT + code:21",    -- Expand window down a little (Equal; rebound to Monitor scaling down)
+  "SUPER + CTRL + code:21",           -- Shrink window left a lot (Equal)
+  "SUPER + CTRL + SHIFT + code:21",   -- Expand window down a lot (Equal)
+  "SUPER + SLASH",                    -- Monitor scaling up (rebound to special:slash Vesktop)
+  "SUPER + ALT + SLASH",              -- Monitor scaling down (relocated to SUPER + SHIFT + ALT + equal)
 }) do
   hl.unbind(chord)
 end
 
--- ── Displaced Utility & Application Bindings (utilities.lua / applications.lua) ──
+-- ── Displaced Clipboard, Input Method & Utility Bindings ─────────────────────
 for _, chord in ipairs({
+  "SUPER + A",               -- Select all (clipboard.lua; rebound to special:a)
+  "SUPER + SHIFT + CTRL + A",-- Agent picker (utilities.lua; rebound to Move to special:a)
+  "SUPER + I",               -- Switch input language (input-method.lua; rebound to special:i Thesaurus)
+  "SUPER + comma",           -- Dismiss/invoke/focus last notification (utilities.lua; rebound to special:comma Signal)
   "SUPER + K",               -- Show key bindings (relocated to SUPER + SHIFT + CTRL + ALT + K; rebound to Move focus up)
   "SUPER + CTRL + H",        -- Hardware menu (rebound to Resize window left)
   "SUPER + CTRL + K",        -- Show Herdr key bindings (rebound to Resize window up)
