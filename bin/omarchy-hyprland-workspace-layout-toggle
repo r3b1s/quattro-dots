@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# Override for Omarchy's workspace layout cycler (~/.local/bin/omarchy-hyprland-workspace-layout-toggle).
+# Cycles: master -> dwindle -> scrolling -> floating -> master (with master as the initial default).
+
+notify_layout() {
+  local state="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/workspace-layout-notification"
+  local last id
+  [[ -r $state ]] && read -r last <"$state"
+  if id=$(omarchy-notification-send -p -r "${last:-0}" -g 󱂬 "$1") && [[ $id =~ ^[0-9]+$ ]]; then
+    mkdir -p "$(dirname "$state")" && printf '%s\n' "$id" >"$state"
+  fi
+}
+
+DIRECTION=${1:-next}
+if [[ $DIRECTION != "next" && $DIRECTION != "back" ]]; then
+  echo "Usage: omarchy-hyprland-workspace-layout-toggle [back]" >&2
+  exit 1
+fi
+
+ACTIVE_WORKSPACE=$(hyprctl activeworkspace -j | jq -r '.id')
+[[ $ACTIVE_WORKSPACE =~ ^[0-9]+$ ]] || exit 1
+MODES_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/workspace-layouts"
+MODE_FILE="$MODES_DIR/$ACTIVE_WORKSPACE.lua"
+
+CURRENT_MODE=$(omarchy-hyprland-workspace-layout-current)
+
+if [[ $DIRECTION == "back" ]]; then
+  case "$CURRENT_MODE" in
+    master) NEW_MODE=floating ;;
+    floating) NEW_MODE=scrolling ;;
+    scrolling) NEW_MODE=dwindle ;;
+    *) NEW_MODE=master ;;
+  esac
+else
+  case "$CURRENT_MODE" in
+    master) NEW_MODE=dwindle ;;
+    dwindle) NEW_MODE=scrolling ;;
+    scrolling) NEW_MODE=floating ;;
+    *) NEW_MODE=master ;;
+  esac
+fi
+
+APPLY="o.workspace_mode({ workspace = \"$ACTIVE_WORKSPACE\", mode = \"$NEW_MODE\" }); if o.sync_layout_bindings then o.sync_layout_bindings(\"$NEW_MODE\") end"
+
+case $NEW_MODE in
+  master)
+    SET_MESSAGE="Switched to master layout"
+    UNSAVED_MESSAGE="Switched to master layout (not saved)"
+    ;;
+  dwindle)
+    SET_MESSAGE=$(omarchy-i18n layout.workspaceTiling)
+    UNSAVED_MESSAGE=$(omarchy-i18n layout.workspaceTilingUnsaved)
+    ;;
+  scrolling)
+    SET_MESSAGE=$(omarchy-i18n layout.workspaceScrolling)
+    UNSAVED_MESSAGE=$(omarchy-i18n layout.workspaceScrollingUnsaved)
+    ;;
+  *)
+    SET_MESSAGE=$(omarchy-i18n layout.workspaceFloating)
+    UNSAVED_MESSAGE=$(omarchy-i18n layout.workspaceFloatingUnsaved)
+    ;;
+esac
+
+APPLIED=0
+if hyprctl eval "$APPLY" >/dev/null 2>&1; then
+  APPLIED=1
+fi
+
+if (( ! APPLIED )); then
+  notify_layout "$(omarchy-i18n layout.needsReload)"
+elif [[ $NEW_MODE == "$(omarchy-hyprland-workspace-layout-default)" ]] && rm -f "$MODE_FILE"; then
+  notify_layout "$SET_MESSAGE"
+elif mkdir -p "$MODES_DIR" && printf '%s\n' "$APPLY" >"$MODE_FILE"; then
+  notify_layout "$SET_MESSAGE"
+else
+  notify_layout "$UNSAVED_MESSAGE"
+fi
+
+if (( APPLIED )); then
+  omarchy-shell -q omarchy.workspaces refresh
+  omarchy-shell -q omarchy.dock refresh
+fi
+
+if (( APPLIED )) && [[ $NEW_MODE == "floating" ]] && ! hyprctl plugin list -j 2>/dev/null | jq -e 'any(.[]?; .name == "hyprbars")' >/dev/null 2>&1; then
+  omarchy-restart-hyprctl
+fi

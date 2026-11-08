@@ -1,3 +1,0 @@
-#!/usr/bin/env sh
-set -eu
-hyprctl eval "package.loaded['hypr.actions'] = nil; require('hypr.actions').cycle_gaps()"
