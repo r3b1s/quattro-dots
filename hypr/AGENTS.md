@@ -1,6 +1,6 @@
 # `hypr/` — Hyprland Keybinding Pipeline & Conditional Layout Bindings
 
-Files in this directory are installed into `~/.config/hypr/` on Omarchy 4.5+ (Quattro RS).
+Files in this directory are installed into `~/.config/hypr/` on Omarchy 4.5+.
 
 ## Layered Keybinding Load Order
 

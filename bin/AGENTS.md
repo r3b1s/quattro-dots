@@ -1,6 +1,6 @@
 # `bin/` — Local Binary Overrides
 
-Scripts in this directory are symlinked into `~/.local/bin` and take precedence over Omarchy's packaged scripts in `/usr/share/omarchy/bin` and `/usr/bin`.
+Scripts in this directory are copied into `~/.local/bin` and take precedence over Omarchy's packaged scripts in `/usr/share/omarchy/bin` and `/usr/bin`.
 
 ## `omarchy-hyprland-workspace-layout-toggle`
 
