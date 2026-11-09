@@ -137,6 +137,15 @@ scratchpad(
   o.launch("vesktop --ozone-platform-hint=auto"),
   { move_keys = "SUPER + SHIFT + CTRL + SLASH" }
 )
+o.bind(
+  "SUPER + Apostrophe",
+  "Discord Mute Toggle",
+  hl.dsp.send_shortcut({
+    mods = "SHIFT + CTRL",
+    key = "M",
+    window = "class:^(vesktop)$",
+  })
+)
 
 -- Moonlight — keep native Moonlight windows in special:ctl_m
 hl.window_rule({
