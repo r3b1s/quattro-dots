@@ -23,6 +23,7 @@ end
 -- ── Displaced Tiling, Layout, Resize & Scaling Bindings (default/hypr/bindings/tiling.lua) ──
 for _, chord in ipairs({
   "SUPER + Q",                        -- Close window (rebound to special:q)
+  "SUPER + O",                        -- Pop window out (rebound to special:o Obsidian)
   "SUPER + J",                        -- Toggle window split (rebound to Move focus down)
   "SUPER + L",                        -- Cycle workspace layout (relocated to SUPER + ALT + Backspace; rebound to Move focus right)
   "SUPER + ALT + L",                  -- Cycle workspace layout back (retired in favor of one-way cycling)
@@ -62,6 +63,7 @@ for _, chord in ipairs({
   "SUPER + SHIFT + F",       -- File manager (relocated to SUPER + SHIFT + E; rebound to Window fullscreen)
   "SUPER + ALT + SHIFT + F", -- File manager cwd (relocated to SUPER + SHIFT + ALT + E)
   "SUPER + SHIFT + N",       -- Editor (used by master layout rollnext)
+  "SUPER + SHIFT + O",       -- Obsidian (applications.lua; rebound to open new Obsidian window)
 }) do
   hl.unbind(chord)
 end

@@ -126,6 +126,10 @@ scratchpad("SUPER + U", "u", nil, { move_keys = "SUPER + SHIFT + CTRL + U" })
 -- Signal
 scratchpad("SUPER + comma", "comma", o.launch("signal-desktop"), { move_keys = "SUPER + SHIFT + CTRL + comma" })
 
+-- Obsidian
+scratchpad("SUPER + O", "o", o.launch("obsidian"), { move_keys = "SUPER + SHIFT + CTRL + O" })
+o.bind("SUPER + SHIFT + O", "Obsidian", o.launch("obsidian"))
+
 -- Discord (Vesktop) — keep transient loading window and main window in special:slash
 hl.window_rule({
   match = { class = "^(vesktop)$" },

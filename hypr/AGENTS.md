@@ -8,7 +8,7 @@ In `hyprland.lua` (directly after `require("default.hypr.omarchy")` loads Omarch
 
 1. **`unbindings.lua`** (`require("hypr.unbindings")`):
    - Dedicated exclusively to `hl.unbind(...)` calls for built-in Omarchy shortcuts that are retired or displaced.
-   - Unbinds all 12 preinstalled web app shortcuts (`default/hypr/bindings/applications.lua`), displaced tiling/scratchpad/fullscreen/resize/scaling keys (`SUPER + Q`, `SUPER + J`, `SUPER + L`, `SUPER + ALT + L`, `SUPER + S`, `SUPER + ALT + S`, `SUPER + F`, `SUPER + CTRL + F`, `SUPER + ALT + F`, `code:20` / `code:21` resize chords, `SUPER + SLASH`, `SUPER + ALT + SLASH`), and displaced clipboard/input-method/utility/application shortcuts (`SUPER + A`, `SUPER + SHIFT + CTRL + A`, `SUPER + I`, `SUPER + comma`, `SUPER + K`, `SUPER + CTRL + H/K/L`, `SUPER + SHIFT + F`, `SUPER + ALT + SHIFT + F`, `SUPER + SHIFT + N`).
+   - Unbinds all 12 preinstalled web app shortcuts (`default/hypr/bindings/applications.lua`), displaced tiling/scratchpad/fullscreen/resize/scaling keys (`SUPER + Q`, `SUPER + O`, `SUPER + J`, `SUPER + L`, `SUPER + ALT + L`, `SUPER + S`, `SUPER + ALT + S`, `SUPER + F`, `SUPER + CTRL + F`, `SUPER + ALT + F`, `code:20` / `code:21` resize chords, `SUPER + SLASH`, `SUPER + ALT + SLASH`), and displaced clipboard/input-method/utility/application shortcuts (`SUPER + A`, `SUPER + SHIFT + CTRL + A`, `SUPER + I`, `SUPER + comma`, `SUPER + K`, `SUPER + CTRL + H/K/L`, `SUPER + SHIFT + F`, `SUPER + ALT + SHIFT + F`, `SUPER + SHIFT + N`, `SUPER + SHIFT + O`).
 2. **`bindings.lua`** (`require("hypr.bindings")`):
    - Overlays personal replacement bindings on top of the cleaned Omarchy defaults using `o.bind(...)`:
      - `SUPER + HJKL` (focus), `SUPER + SHIFT + HJKL` (swap), `SUPER + SHIFT + CTRL + HJKL` (move), and `SUPER + CTRL + HJKL` (proportional resize).
@@ -16,7 +16,7 @@ In `hyprland.lua` (directly after `require("default.hypr.omarchy")` loads Omarch
      - `SUPER + SHIFT + E` and `SUPER + SHIFT + ALT + E` for launching the file manager (`nautilus` / `nautilus-cwd`).
      - `SUPER + SHIFT + CTRL + ALT + K` for the keybindings menu (`omarchy-menu-keybindings`), `SUPER + ALT + Backspace` for one-way workspace layout cycling (`omarchy-hyprland-workspace-layout-toggle`), and `SUPER + SHIFT + ALT + equal` for decreasing monitor scaling (`omarchy-hyprland-monitor-scaling down`).
      - Empty utility special workspaces (`special:a`, `special:q`, `special:y`, `special:u`) with companion `SUPER + SHIFT + CTRL + <key>` move-window bindings.
-     - Application-spawning special workspaces: Signal (`special:comma` on `SUPER + comma` / `SUPER + SHIFT + CTRL + comma`), Vesktop/Discord (`special:slash` on `SUPER + SLASH` / `SUPER + SHIFT + CTRL + SLASH` + window rule), Moonlight (`special:ctl_m` on `SUPER + CTRL + M` + window rule), and OneLook Thesaurus (`special:i` on `SUPER + I`), along with Discord mute toggle (`SUPER + Apostrophe` sending `SHIFT + CTRL + M` targeted to Vesktop).
+     - Application-spawning special workspaces: Signal (`special:comma` on `SUPER + comma` / `SUPER + SHIFT + CTRL + comma`), Obsidian (`special:o` on `SUPER + O` / `SUPER + SHIFT + CTRL + O`), Vesktop/Discord (`special:slash` on `SUPER + SLASH` / `SUPER + SHIFT + CTRL + SLASH` + window rule), Moonlight (`special:ctl_m` on `SUPER + CTRL + M` + window rule), and OneLook Thesaurus (`special:i` on `SUPER + I`), along with Discord mute toggle (`SUPER + Apostrophe` sending `SHIFT + CTRL + M` targeted to Vesktop) and new Obsidian window launch (`SUPER + SHIFT + O`).
      - Direct web app launches (without special workspaces) for Proton Mail (`SUPER + E`) and Proton Calendar (`SUPER + equal`).
 3. **`layout-specific-bindings.lua` & `layouts/*.lua`** (`require("hypr.layout-specific-bindings")`):
    - Prepends `~/.local/bin` ahead of `/usr/share/omarchy/bin` in `hl.env("PATH", ...)` so `~/.local/bin/omarchy-hyprland-workspace-layout-toggle` shadows the packaged Omarchy script inside Hyprland dispatchers.
@@ -34,6 +34,7 @@ Special workspaces defined by **this dotfiles repository** are named after the k
 
 - Modifiers appear in the fixed order `sft` (`SHIFT`), `ctl` (`CTRL`), `alt` (`ALT`) only when present, separated by underscores, followed by the lowercase xkb keysym name:
   - `SUPER + I` → `i` (`special:i`)
+  - `SUPER + O` → `o` (`special:o`)
   - `SUPER + A` → `a` (`special:a`)
   - `SUPER + Q` → `q` (`special:q`)
   - `SUPER + Y` → `y` (`special:y`)
