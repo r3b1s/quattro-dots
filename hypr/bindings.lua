@@ -119,6 +119,8 @@ o.bind("SUPER + SHIFT + ALT + equal", "Monitor scaling down", "omarchy-hyprland-
 -- ── eco-mode ───────────────────────────────────────────────────────────────
 local eco_flag = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/hypr/"
   .. (os.getenv("HYPRLAND_INSTANCE_SIGNATURE") or "") .. "/eco-mode"
+local eco_notif_file = (os.getenv("XDG_STATE_HOME") or ((os.getenv("HOME") or "/tmp") .. "/.local/state"))
+  .. "/omarchy/eco-mode-notification"
 
 local function eco_active()
   local f = io.open(eco_flag, "r")
@@ -126,6 +128,37 @@ local function eco_active()
     f:close()
   end
   return f ~= nil
+end
+
+local function eco_notify(headline, description)
+  local last = nil
+  local rf = io.open(eco_notif_file, "r")
+  if rf then
+    last = rf:read("*l")
+    rf:close()
+  end
+
+  local last_id = tonumber(last)
+  if last_id and last_id > 0 then
+    hl.dispatch(
+      hl.dsp.exec_cmd(
+        "busctl --user call org.freedesktop.Notifications /org/freedesktop/Notifications org.freedesktop.Notifications CloseNotification u "
+          .. last_id
+          .. " 2>/dev/null || true"
+      )
+    )
+  end
+
+  local replaces_arg = (last_id and last_id > 0) and ("-r " .. last_id .. " ") or ""
+  local cmd = string.format(
+    'mkdir -p "$(dirname %q)" && id=$(omarchy-notification-send -p %s%q %q) && printf "%%s\\n" "$id" >%q',
+    eco_notif_file,
+    replaces_arg,
+    headline,
+    description,
+    eco_notif_file
+  )
+  hl.dispatch(hl.dsp.exec_cmd(cmd))
 end
 
 if eco_active() then
@@ -151,13 +184,13 @@ end
 o.bind("SUPER + SHIFT + CTRL + ALT + G", "Toggle eco-mode", function()
   if eco_active() then
     os.remove(eco_flag)
-    hl.dispatch(hl.dsp.exec_cmd('omarchy-notification-send "eco-mode off" "Compositor effects restored"'))
+    eco_notify("eco-mode off", "Compositor effects restored")
   else
     local f = io.open(eco_flag, "w")
     if f then
       f:close()
     end
-    hl.dispatch(hl.dsp.exec_cmd('omarchy-notification-send "eco-mode on" "Compositor effects off, no gaps or rounding"'))
+    eco_notify("eco-mode on", "Compositor effects off, no gaps or rounding")
   end
   hl.dispatch(hl.dsp.exec_cmd("hyprctl reload"))
 end)
