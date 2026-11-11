@@ -127,6 +127,12 @@ main() {
     done < <(find "$REPO_DIR/hypr" -type f ! -name "AGENTS.md" ! -name ".*" -print0 | sort -z)
   fi
 
+  # 3. Starship configuration (~/.config/starship.toml)
+  log "Installing Starship configuration to $CONFIG_DIR/starship.toml"
+  if [[ -f "$REPO_DIR/starship/starship.toml" ]]; then
+    copy_file "$REPO_DIR/starship/starship.toml" "$CONFIG_DIR/starship.toml" 0644
+  fi
+
   log "Done! Installation is up to date."
 }
 

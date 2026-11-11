@@ -4,7 +4,7 @@ These are the personal dotfiles for a single user running Omarchy 4.5.0 or later
 
 ## Scope
 
-This repository provides a streamlined configuration tailored for Omarchy 4.5+. At present, only the keybinding pipeline and workspace layout cycler are migrated and managed here.
+This repository provides a streamlined configuration tailored for Omarchy 4.5+. At present, the keybinding pipeline, workspace layout cycler, and Starship prompt configuration are migrated and managed here.
 
 ## Core Philosophy: Idempotency & Direct Copy Model
 
@@ -26,6 +26,9 @@ This repository provides a streamlined configuration tailored for Omarchy 4.5+. 
 - **`bin/`** → `~/.local/bin/` (permissions: `0755`)
   - Custom shell utilities and overrides (e.g. `omarchy-hyprland-workspace-layout-toggle`).
   - See `bin/AGENTS.md` for binary override details.
+- **`starship/`** → `~/.config/` (permissions: `0644`)
+  - Cross-shell prompt configuration (`starship/starship.toml` -> `~/.config/starship.toml`).
+  - See `starship/AGENTS.md` for prompt configuration details.
 
 ## Installation
 
