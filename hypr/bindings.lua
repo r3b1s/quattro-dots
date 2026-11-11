@@ -116,6 +116,52 @@ o.bind("SUPER + SHIFT + CTRL + ALT + K", "Show key bindings", "omarchy-menu-keyb
 o.bind("SUPER + ALT + Backspace", "Cycle workspace layout", "omarchy-hyprland-workspace-layout-toggle")
 o.bind("SUPER + SHIFT + ALT + equal", "Monitor scaling down", "omarchy-hyprland-monitor-scaling down")
 
+-- ── Eco Mode ───────────────────────────────────────────────────────────────
+local eco_flag = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/hypr/"
+  .. (os.getenv("HYPRLAND_INSTANCE_SIGNATURE") or "") .. "/eco-mode"
+
+local function eco_active()
+  local f = io.open(eco_flag, "r")
+  if f then
+    f:close()
+  end
+  return f ~= nil
+end
+
+if eco_active() then
+  hl.config({
+    animations = { enabled = false },
+    decoration = {
+      blur = { enabled = false, special = false, popups = false, input_methods = false },
+      shadow = { enabled = false },
+      glow = { enabled = false },
+      motion_blur = { enabled = false },
+      screen_shader = "",
+      active_opacity = 1,
+      inactive_opacity = 1,
+      fullscreen_opacity = 1,
+      dim_inactive = false,
+      dim_special = 1,
+      rounding = 0,
+    },
+    general = { gaps_in = 0, gaps_out = 0, border_size = 1 },
+  })
+end
+
+o.bind("SUPER + SHIFT + CTRL + ALT + G", "Toggle eco mode", function()
+  if eco_active() then
+    os.remove(eco_flag)
+    hl.dispatch(hl.dsp.exec_cmd('omarchy-notification-send "Eco mode off" "Compositor effects restored"'))
+  else
+    local f = io.open(eco_flag, "w")
+    if f then
+      f:close()
+    end
+    hl.dispatch(hl.dsp.exec_cmd('omarchy-notification-send "Eco mode on" "Compositor effects off, no gaps or rounding"'))
+  end
+  hl.dispatch(hl.dsp.exec_cmd("hyprctl reload"))
+end)
+
 -- ── Empty / Utility Special Workspaces (Scratchpads) ───────────────────────
 scratchpad("SUPER + A", "a", nil, { move_keys = "SUPER + SHIFT + CTRL + A" })
 scratchpad("SUPER + Q", "q", nil, { move_keys = "SUPER + SHIFT + CTRL + Q" })
