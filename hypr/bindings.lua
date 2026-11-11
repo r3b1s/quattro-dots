@@ -139,16 +139,6 @@ local function eco_notify(headline, description)
   end
 
   local last_id = tonumber(last)
-  if last_id and last_id > 0 then
-    hl.dispatch(
-      hl.dsp.exec_cmd(
-        "busctl --user call org.freedesktop.Notifications /org/freedesktop/Notifications org.freedesktop.Notifications CloseNotification u "
-          .. last_id
-          .. " 2>/dev/null || true"
-      )
-    )
-  end
-
   local replaces_arg = (last_id and last_id > 0) and ("-r " .. last_id .. " ") or ""
   local cmd = string.format(
     'mkdir -p "$(dirname %q)" && id=$(omarchy-notification-send -p %s%q %q) && printf "%%s\\n" "$id" >%q',
