@@ -116,7 +116,7 @@ o.bind("SUPER + SHIFT + CTRL + ALT + K", "Show key bindings", "omarchy-menu-keyb
 o.bind("SUPER + ALT + Backspace", "Cycle workspace layout", "omarchy-hyprland-workspace-layout-toggle")
 o.bind("SUPER + SHIFT + ALT + equal", "Monitor scaling down", "omarchy-hyprland-monitor-scaling down")
 
--- ── Eco Mode ───────────────────────────────────────────────────────────────
+-- ── eco-mode ───────────────────────────────────────────────────────────────
 local eco_flag = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/hypr/"
   .. (os.getenv("HYPRLAND_INSTANCE_SIGNATURE") or "") .. "/eco-mode"
 
@@ -148,16 +148,16 @@ if eco_active() then
   })
 end
 
-o.bind("SUPER + SHIFT + CTRL + ALT + G", "Toggle eco mode", function()
+o.bind("SUPER + SHIFT + CTRL + ALT + G", "Toggle eco-mode", function()
   if eco_active() then
     os.remove(eco_flag)
-    hl.dispatch(hl.dsp.exec_cmd('omarchy-notification-send "Eco mode off" "Compositor effects restored"'))
+    hl.dispatch(hl.dsp.exec_cmd('omarchy-notification-send "eco-mode off" "Compositor effects restored"'))
   else
     local f = io.open(eco_flag, "w")
     if f then
       f:close()
     end
-    hl.dispatch(hl.dsp.exec_cmd('omarchy-notification-send "Eco mode on" "Compositor effects off, no gaps or rounding"'))
+    hl.dispatch(hl.dsp.exec_cmd('omarchy-notification-send "eco-mode on" "Compositor effects off, no gaps or rounding"'))
   end
   hl.dispatch(hl.dsp.exec_cmd("hyprctl reload"))
 end)
