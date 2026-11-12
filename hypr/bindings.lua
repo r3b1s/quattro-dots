@@ -81,7 +81,6 @@ o.bind("SUPER + CTRL + J", "Resize window down", function()
 end, { repeating = true })
 
 -- ── Fullscreen States (F) ──────────────────────────────────────────────────
--- Excludes SUPER + SHIFT + CTRL + ALT + F (toggle floating), leaving floating on stock SUPER + T.
 local maximize_toggle =
   'if [ "$(hyprctl activewindow -j | jq -r \'.fullscreen\')" = "1" ]; then hyprctl dispatch \'hl.dsp.window.fullscreen_state({ internal = 0, client = -1, action = "set" })\'; else hyprctl dispatch \'hl.dsp.window.fullscreen_state({ internal = 1, client = -1, action = "set" })\'; fi'
 
@@ -107,6 +106,38 @@ o.bind(
   hl.dsp.window.fullscreen_state({ internal = 0, client = 0, action = "set" })
 )
 
+-- ── Window Floating & Pseudotiling (relocated from SUPER + T / SUPER + P) ──
+o.bind("SUPER + SHIFT + CTRL + ALT + F", "Toggle window floating/tiling", hl.dsp.window.float({ action = "toggle" }))
+o.bind("SUPER + SHIFT + CTRL + ALT + P", "Pseudo window", hl.dsp.window.pseudo())
+
+-- ── Terminal & Activity (btop) ─────────────────────────────────────────────
+o.bind("SUPER + SHIFT + T", "Terminal (new window)", o.launch_terminal())
+
+-- Toggle a floating btop on the current workspace: close it if one is
+-- already there, otherwise launch one (org.omarchy.btop floats via Omarchy's
+-- system window rules).
+local floating_btop_class = "org.omarchy.btop"
+
+o.bind("SUPER + SHIFT + P", "Activity (toggle floating btop)", function()
+  local workspace = hl.get_active_workspace()
+  local found = false
+  if workspace then
+    for _, window in ipairs(hl.get_windows()) do
+      if window.class == floating_btop_class
+        and window.floating
+        and window.workspace
+        and window.workspace.id == workspace.id
+      then
+        hl.dispatch(hl.dsp.window.close({ window = window }))
+        found = true
+      end
+    end
+  end
+  if not found then
+    hl.exec_cmd("omarchy-launch-tui btop")
+  end
+end)
+
 -- ── File Manager (E) ───────────────────────────────────────────────────────
 o.bind("SUPER + SHIFT + E", "File manager", { omarchy = "nautilus" })
 o.bind("SUPER + SHIFT + ALT + E", "File manager (cwd)", { omarchy = "nautilus-cwd" })
@@ -114,7 +145,9 @@ o.bind("SUPER + SHIFT + ALT + E", "File manager (cwd)", { omarchy = "nautilus-cw
 -- ── Relocated Omarchy Utilities & Monitor Scaling ──────────────────────────
 o.bind("SUPER + SHIFT + CTRL + ALT + K", "Show key bindings", "omarchy-menu-keybindings")
 o.bind("SUPER + ALT + Backspace", "Cycle workspace layout", "omarchy-hyprland-workspace-layout-toggle")
-o.bind("SUPER + SHIFT + ALT + equal", "Monitor scaling down", "omarchy-hyprland-monitor-scaling down")
+-- code:21 is the Equal key; matches the chords unbound in hypr/unbindings.lua.
+o.bind("SUPER + SHIFT + code:21", "Monitor scaling up", "omarchy-hyprland-monitor-scaling up")
+o.bind("SUPER + ALT + code:21", "Monitor scaling down", "omarchy-hyprland-monitor-scaling down")
 
 -- ── eco-mode ───────────────────────────────────────────────────────────────
 local eco_flag = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/hypr/"
@@ -190,8 +223,15 @@ scratchpad("SUPER + A", "a", nil, { move_keys = "SUPER + SHIFT + CTRL + A" })
 scratchpad("SUPER + Q", "q", nil, { move_keys = "SUPER + SHIFT + CTRL + Q" })
 scratchpad("SUPER + Y", "y", nil, { move_keys = "SUPER + SHIFT + CTRL + Y" })
 scratchpad("SUPER + U", "u", nil, { move_keys = "SUPER + SHIFT + CTRL + U" })
+scratchpad("SUPER + period", "period", nil, { move_keys = "SUPER + SHIFT + CTRL + period" })
 
 -- ── Application-Spawning Special Workspaces ────────────────────────────────
+-- Terminal
+scratchpad("SUPER + T", "t", "omarchy-launch-terminal", { move_keys = "SUPER + SHIFT + CTRL + T" })
+
+-- btop (tiled) — TUI.btop gets the terminal tag but not Omarchy's floating rule
+scratchpad("SUPER + P", "p", "omarchy-launch-tui --app-id=TUI.btop btop")
+
 -- Signal
 scratchpad("SUPER + comma", "comma", o.launch("signal-desktop"), { move_keys = "SUPER + SHIFT + CTRL + comma" })
 

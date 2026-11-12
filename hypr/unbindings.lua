@@ -22,6 +22,8 @@ end
 
 -- ── Displaced Tiling, Layout, Resize & Scaling Bindings (default/hypr/bindings/tiling.lua) ──
 for _, chord in ipairs({
+  "SUPER + P",                        -- Pseudo window (relocated to SUPER + SHIFT + CTRL + ALT + P; rebound to special:p btop)
+  "SUPER + T",                        -- Toggle window floating/tiling (relocated to SUPER + SHIFT + CTRL + ALT + F; rebound to special:t terminal)
   "SUPER + Q",                        -- Close window (rebound to special:q)
   "SUPER + O",                        -- Pop window out (rebound to special:o Obsidian)
   "SUPER + J",                        -- Toggle window split (rebound to Move focus down)
@@ -39,13 +41,13 @@ for _, chord in ipairs({
   "SUPER + CTRL + code:20",           -- Expand window left a lot (Minus)
   "SUPER + CTRL + SHIFT + code:20",   -- Shrink window up a lot (Minus)
   "SUPER + code:21",                  -- Shrink window left (Equal; rebound to Proton Calendar)
-  "SUPER + SHIFT + code:21",          -- Expand window down (Equal)
-  "SUPER + ALT + code:21",            -- Shrink window left a little (Equal)
-  "SUPER + SHIFT + ALT + code:21",    -- Expand window down a little (Equal; rebound to Monitor scaling down)
+  "SUPER + SHIFT + code:21",          -- Expand window down (Equal; rebound to Monitor scaling up)
+  "SUPER + ALT + code:21",            -- Shrink window left a little (Equal; rebound to Monitor scaling down)
+  "SUPER + SHIFT + ALT + code:21",    -- Expand window down a little (Equal)
   "SUPER + CTRL + code:21",           -- Shrink window left a lot (Equal)
   "SUPER + CTRL + SHIFT + code:21",   -- Expand window down a lot (Equal)
-  "SUPER + SLASH",                    -- Monitor scaling up (rebound to special:slash Vesktop)
-  "SUPER + ALT + SLASH",              -- Monitor scaling down (relocated to SUPER + SHIFT + ALT + equal)
+  "SUPER + SLASH",                    -- Monitor scaling up (relocated to SUPER + SHIFT + equal; rebound to special:slash Vesktop)
+  "SUPER + ALT + SLASH",              -- Monitor scaling down (relocated to SUPER + ALT + equal)
 }) do
   hl.unbind(chord)
 end
@@ -64,6 +66,8 @@ for _, chord in ipairs({
   "SUPER + ALT + SHIFT + F", -- File manager cwd (relocated to SUPER + SHIFT + ALT + E)
   "SUPER + SHIFT + N",       -- Editor (used by master layout rollnext)
   "SUPER + SHIFT + O",       -- Obsidian (applications.lua; rebound to open new Obsidian window)
+  "SUPER + SHIFT + SLASH",   -- Passwords / 1Password (applications.lua; retired)
+  "SUPER + SHIFT + T",       -- Activity / btop (utilities.lua; rebound to new terminal window)
 }) do
   hl.unbind(chord)
 end

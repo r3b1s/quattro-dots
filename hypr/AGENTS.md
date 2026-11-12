@@ -8,15 +8,17 @@ In `hyprland.lua` (directly after `require("default.hypr.omarchy")` loads Omarch
 
 1. **`unbindings.lua`** (`require("hypr.unbindings")`):
    - Dedicated exclusively to `hl.unbind(...)` calls for built-in Omarchy shortcuts that are retired or displaced.
-   - Unbinds all 12 preinstalled web app shortcuts (`default/hypr/bindings/applications.lua`), displaced tiling/scratchpad/fullscreen/resize/scaling keys (`SUPER + Q`, `SUPER + O`, `SUPER + J`, `SUPER + L`, `SUPER + ALT + L`, `SUPER + S`, `SUPER + ALT + S`, `SUPER + F`, `SUPER + CTRL + F`, `SUPER + ALT + F`, `code:20` / `code:21` resize chords, `SUPER + SLASH`, `SUPER + ALT + SLASH`), and displaced clipboard/input-method/utility/application shortcuts (`SUPER + A`, `SUPER + SHIFT + CTRL + A`, `SUPER + I`, `SUPER + comma`, `SUPER + K`, `SUPER + CTRL + H/K/L`, `SUPER + SHIFT + F`, `SUPER + ALT + SHIFT + F`, `SUPER + SHIFT + N`, `SUPER + SHIFT + O`).
+   - Unbinds all 12 preinstalled web app shortcuts (`default/hypr/bindings/applications.lua`), displaced tiling/scratchpad/fullscreen/resize/scaling keys (`SUPER + P`, `SUPER + T`, `SUPER + Q`, `SUPER + O`, `SUPER + J`, `SUPER + L`, `SUPER + ALT + L`, `SUPER + S`, `SUPER + ALT + S`, `SUPER + F`, `SUPER + CTRL + F`, `SUPER + ALT + F`, `code:20` / `code:21` resize chords, `SUPER + SLASH`, `SUPER + ALT + SLASH`), and displaced clipboard/input-method/utility/application shortcuts (`SUPER + A`, `SUPER + SHIFT + CTRL + A`, `SUPER + I`, `SUPER + comma`, `SUPER + K`, `SUPER + CTRL + H/K/L`, `SUPER + SHIFT + F`, `SUPER + ALT + SHIFT + F`, `SUPER + SHIFT + N`, `SUPER + SHIFT + O`, `SUPER + SHIFT + SLASH` (1Password, retired), `SUPER + SHIFT + T`).
 2. **`bindings.lua`** (`require("hypr.bindings")`):
    - Overlays personal replacement bindings on top of the cleaned Omarchy defaults using `o.bind(...)`:
      - `SUPER + HJKL` (focus), `SUPER + SHIFT + HJKL` (swap), `SUPER + SHIFT + CTRL + HJKL` (move), and `SUPER + CTRL + HJKL` (proportional resize).
-     - `SUPER + F` / `SHIFT + F` / `CTRL + F` / `ALT + F` / `SHIFT + CTRL + F` for fullscreen and window state control (leaving `SUPER + T` as the stock floating toggle).
+     - `SUPER + F` / `SHIFT + F` / `CTRL + F` / `ALT + F` / `SHIFT + CTRL + F` for fullscreen and window state control.
+     - `SUPER + SHIFT + CTRL + ALT + F` (toggle floating, relocated from `SUPER + T`) and `SUPER + SHIFT + CTRL + ALT + P` (pseudotile, relocated from `SUPER + P`).
+     - `SUPER + SHIFT + T` for a new default-terminal window, and `SUPER + SHIFT + P` to toggle a floating btop (`org.omarchy.btop`) on the current workspace (closes it if present, launches it otherwise).
      - `SUPER + SHIFT + E` and `SUPER + SHIFT + ALT + E` for launching the file manager (`nautilus` / `nautilus-cwd`).
-     - `SUPER + SHIFT + CTRL + ALT + K` for the keybindings menu (`omarchy-menu-keybindings`), `SUPER + ALT + Backspace` for one-way workspace layout cycling (`omarchy-hyprland-workspace-layout-toggle`), `SUPER + SHIFT + ALT + equal` for decreasing monitor scaling (`omarchy-hyprland-monitor-scaling down`), and `SUPER + SHIFT + CTRL + ALT + G` for toggling eco-mode.
-     - Empty utility special workspaces (`special:a`, `special:q`, `special:y`, `special:u`) with companion `SUPER + SHIFT + CTRL + <key>` move-window bindings.
-     - Application-spawning special workspaces: Signal (`special:comma` on `SUPER + comma` / `SUPER + SHIFT + CTRL + comma`), Obsidian (`special:o` on `SUPER + O` / `SUPER + SHIFT + CTRL + O`), Vesktop/Discord (`special:slash` on `SUPER + SLASH` / `SUPER + SHIFT + CTRL + SLASH` + window rule), Moonlight (`special:ctl_m` on `SUPER + CTRL + M` + window rule), and OneLook Thesaurus (`special:i` on `SUPER + I`), along with Discord mute toggle (`SUPER + Apostrophe` sending `SHIFT + CTRL + M` targeted to Vesktop) and new Obsidian window launch (`SUPER + SHIFT + O`).
+     - `SUPER + SHIFT + CTRL + ALT + K` for the keybindings menu (`omarchy-menu-keybindings`), `SUPER + ALT + Backspace` for one-way workspace layout cycling (`omarchy-hyprland-workspace-layout-toggle`), `SUPER + SHIFT + equal` / `SUPER + ALT + equal` (bound as `code:21`) for increasing / decreasing monitor scaling (`omarchy-hyprland-monitor-scaling up|down`), and `SUPER + SHIFT + CTRL + ALT + G` for toggling eco-mode.
+     - Empty utility special workspaces (`special:a`, `special:q`, `special:y`, `special:u`, `special:period`) with companion `SUPER + SHIFT + CTRL + <key>` move-window bindings.
+     - Application-spawning special workspaces: default terminal (`special:t` on `SUPER + T` / `SUPER + SHIFT + CTRL + T`), tiled btop (`special:p` on `SUPER + P`, app-id `TUI.btop` so it is not floated), Signal (`special:comma` on `SUPER + comma` / `SUPER + SHIFT + CTRL + comma`), Obsidian (`special:o` on `SUPER + O` / `SUPER + SHIFT + CTRL + O`), Vesktop/Discord (`special:slash` on `SUPER + SLASH` / `SUPER + SHIFT + CTRL + SLASH` + window rule), Moonlight (`special:ctl_m` on `SUPER + CTRL + M` + window rule), and OneLook Thesaurus (`special:i` on `SUPER + I`), along with Discord mute toggle (`SUPER + Apostrophe` sending `SHIFT + CTRL + M` targeted to Vesktop) and new Obsidian window launch (`SUPER + SHIFT + O`).
      - Direct web app launches (without special workspaces) for Proton Mail (`SUPER + E`) and Proton Calendar (`SUPER + equal`).
 3. **`layout-specific-bindings.lua` & `layouts/*.lua`** (`require("hypr.layout-specific-bindings")`):
    - Prepends `~/.local/bin` ahead of `/usr/share/omarchy/bin` in `hl.env("PATH", ...)` so `~/.local/bin/omarchy-hyprland-workspace-layout-toggle` shadows the packaged Omarchy script inside Hyprland dispatchers.
@@ -39,6 +41,9 @@ Special workspaces defined by **this dotfiles repository** are named after the k
   - `SUPER + Q` → `q` (`special:q`)
   - `SUPER + Y` → `y` (`special:y`)
   - `SUPER + U` → `u` (`special:u`)
+  - `SUPER + P` → `p` (`special:p`)
+  - `SUPER + T` → `t` (`special:t`)
+  - `SUPER + period` → `period` (`special:period`)
   - `SUPER + SLASH` → `slash` (`special:slash`)
   - `SUPER + comma` → `comma` (`special:comma`)
   - `SUPER + CTRL + M` → `ctl_m` (`special:ctl_m`)
