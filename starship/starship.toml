@@ -2,7 +2,7 @@ add_newline = true
 command_timeout = 200
 follow_symlinks = true
 format = """
-[\\[](bold red)$username[@](bold red)$hostname[\\[](bold red)[$directory]($style)[\\]](bold red)
+[\\[](bold cyan)$username[@](bold cyan)$hostname[\\[](bold cyan)[$directory]($style)[\\]](bold cyan)
 [$git_branch$git_status]($style)$character
 """
 
@@ -16,9 +16,9 @@ format = """
 format = "[$user]($style)"
 show_always = true
 
-style_user = "bold red"
+style_user = "bold cyan"
 [hostname]
-format = "[$hostname](bold red)[\\]](bold red)[$ssh_symbol](bold green)"
+format = "[$hostname](bold cyan)[\\]](bold cyan)[$ssh_symbol](bold green)"
 ssh_only = false
 ssh_symbol = "\\[SSH\\]"
 disabled = false
