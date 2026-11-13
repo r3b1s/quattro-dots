@@ -71,3 +71,6 @@ for _, chord in ipairs({
 }) do
   hl.unbind(chord)
 end
+
+-- ── Dictation Bindings (default/hypr/bindings/dictation.lua) ─────────────────
+hl.unbind("ALT + Alt_R") -- Push-to-talk dictation (Right Alt)
