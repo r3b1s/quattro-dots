@@ -3,20 +3,38 @@
 -- hypr/layout-specific-bindings.lua.
 
 local scratchpad_prefix = "Scratchpad:"
+local on_created_empty_cmds = {}
+
+-- Pin spawned scratchpad apps to their special workspace even when
+-- misc.initial_workspace_tracking is off, and only when the workspace was
+-- created empty (not by moving an existing window into it).
+hl.on("workspace.created", function(ws)
+  if ws and ws.is_empty then
+    local cmd = on_created_empty_cmds[ws.name]
+    if cmd then
+      hl.exec_cmd(cmd, { workspace = ws.name .. " silent" })
+    end
+  end
+end)
 
 local function special(name, options)
   options = options or {}
-  local rule = { workspace = "special:" .. name }
-  if options.layout then
-    rule.layout = options.layout
-  end
-  if options.layout_opts then
-    rule.layout_opts = options.layout_opts
-  end
+  local workspace_name = "special:" .. name
+
   if options.on_created_empty then
-    rule.on_created_empty = options.on_created_empty
+    on_created_empty_cmds[workspace_name] = options.on_created_empty
   end
-  hl.workspace_rule(rule)
+
+  if options.layout or options.layout_opts then
+    local rule = { workspace = workspace_name }
+    if options.layout then
+      rule.layout = options.layout
+    end
+    if options.layout_opts then
+      rule.layout_opts = options.layout_opts
+    end
+    hl.workspace_rule(rule)
+  end
 end
 
 local function toggle_special(keys, name, description)
@@ -141,6 +159,9 @@ end)
 -- ── File Manager (E) ───────────────────────────────────────────────────────
 o.bind("SUPER + SHIFT + E", "File manager", { omarchy = "nautilus" })
 o.bind("SUPER + SHIFT + ALT + E", "File manager (cwd)", { omarchy = "nautilus-cwd" })
+
+-- ── Browser (B) ────────────────────────────────────────────────────────────
+o.bind("SUPER + B", "Browser", { omarchy = "browser" })
 
 -- ── Relocated Omarchy Utilities & Monitor Scaling ──────────────────────────
 o.bind("SUPER + SHIFT + CTRL + ALT + K", "Show key bindings", "omarchy-menu-keybindings")
