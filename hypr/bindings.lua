@@ -170,6 +170,10 @@ o.bind("SUPER + ALT + Backspace", "Cycle workspace layout", "omarchy-hyprland-wo
 o.bind("SUPER + SHIFT + code:21", "Monitor scaling up", "omarchy-hyprland-monitor-scaling up")
 o.bind("SUPER + ALT + code:21", "Monitor scaling down", "omarchy-hyprland-monitor-scaling down")
 
+-- ── Screenshot ─────────────────────────────────────────────────────────────
+-- Same action as Omarchy's default SUPER + CTRL + ALT + C binding.
+o.bind("SUPER + semicolon", "Screenshot", "omarchy-capture-screenshot")
+
 -- ── eco-mode ───────────────────────────────────────────────────────────────
 local eco_flag = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/hypr/"
   .. (os.getenv("HYPRLAND_INSTANCE_SIGNATURE") or "") .. "/eco-mode"
