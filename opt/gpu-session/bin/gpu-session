@@ -188,7 +188,12 @@ fi
 
 if [ "\$__quattro_gpu_target" = "rtx3070" ]; then
   export QUATTRO_GPU_SESSION="rtx3070"
-  export AQ_DRM_DEVICES="$RTX3070_BY_PATH"
+  __quattro_drm_dev="\$(readlink -f "$RTX3070_BY_PATH" 2>/dev/null || true)"
+  if [ -n "\$__quattro_drm_dev" ] && [ -e "\$__quattro_drm_dev" ]; then
+    export AQ_DRM_DEVICES="\$__quattro_drm_dev"
+  else
+    unset AQ_DRM_DEVICES
+  fi
   export __EGL_VENDOR_LIBRARY_FILENAMES="/usr/share/glvnd/egl_vendor.d/10_nvidia.json"
   export __GLX_VENDOR_LIBRARY_NAME="nvidia"
   export LIBVA_DRIVER_NAME="nvidia"
@@ -197,7 +202,12 @@ if [ "\$__quattro_gpu_target" = "rtx3070" ]; then
   unset VDPAU_DRIVER
 else
   export QUATTRO_GPU_SESSION="rx580"
-  export AQ_DRM_DEVICES="$RX580_BY_PATH"
+  __quattro_drm_dev="\$(readlink -f "$RX580_BY_PATH" 2>/dev/null || true)"
+  if [ -n "\$__quattro_drm_dev" ] && [ -e "\$__quattro_drm_dev" ]; then
+    export AQ_DRM_DEVICES="\$__quattro_drm_dev"
+  else
+    unset AQ_DRM_DEVICES
+  fi
   export __EGL_VENDOR_LIBRARY_FILENAMES="/usr/share/glvnd/egl_vendor.d/50_mesa.json"
   export __GLX_VENDOR_LIBRARY_NAME="mesa"
   export LIBVA_DRIVER_NAME="radeonsi"
@@ -206,7 +216,7 @@ else
   unset NVD_BACKEND
 fi
 
-unset __quattro_gpu_target __quattro_rx580_connected __quattro_3070_connected __quattro_st
+unset __quattro_gpu_target __quattro_rx580_connected __quattro_3070_connected __quattro_st __quattro_drm_dev
 EOF
 }
 
@@ -267,6 +277,9 @@ cmd_status() {
   mapfile -t rtx_outputs < <(connected_outputs_for_pci "$RTX3070_PCI")
 
   local hypr_gpu_session hypr_aq_drm aquamarine_isolated="false" active_gpu="unknown"
+  local rx_card_node rtx_card_node
+  rx_card_node="$(readlink -f "$RX580_BY_PATH" 2>/dev/null || true)"
+  rtx_card_node="$(readlink -f "$RTX3070_BY_PATH" 2>/dev/null || true)"
   hypr_gpu_session="$(read_hyprland_env_var "QUATTRO_GPU_SESSION")"
   hypr_aq_drm="$(read_hyprland_env_var "AQ_DRM_DEVICES")"
   if [[ -n "$hypr_aq_drm" ]]; then
@@ -275,9 +288,9 @@ cmd_status() {
 
   if [[ "$hypr_gpu_session" == "rx580" || "$hypr_gpu_session" == "rtx3070" ]]; then
     active_gpu="$hypr_gpu_session"
-  elif [[ "$hypr_aq_drm" == *"$RX580_PCI"* ]]; then
+  elif [[ "$hypr_aq_drm" == *"$RX580_PCI"* ]] || { [[ -n "$rx_card_node" ]] && [[ "$hypr_aq_drm" == *"$rx_card_node"* ]]; }; then
     active_gpu="rx580"
-  elif [[ "$hypr_aq_drm" == *"$RTX3070_PCI"* ]]; then
+  elif [[ "$hypr_aq_drm" == *"$RTX3070_PCI"* ]] || { [[ -n "$rtx_card_node" ]] && [[ "$hypr_aq_drm" == *"$rtx_card_node"* ]]; }; then
     active_gpu="rtx3070"
   elif (( ${#rx_outputs[@]} > 0 )) && (( ${#rtx_outputs[@]} == 0 )); then
     active_gpu="rx580"
