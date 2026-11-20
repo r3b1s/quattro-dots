@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "t.gpu-session",
+  "name": "GPU Session",
+  "version": "1.0.0",
+  "author": "t",
+  "description": "Dual-GPU session switcher and RTX 3070 AI VRAM isolation monitor",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "GPU Session",
+    "description": "Switch desktop GPU between RX 580 and RTX 3070 and monitor 3070 VRAM isolation",
+    "category": "System",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

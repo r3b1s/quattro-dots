@@ -27,5 +27,8 @@ require("hypr.autostart")
 -- Toggle config flags dynamically.
 require("default.hypr.toggles")
 
+-- Optional host-local GPU override (e.g. opt/gpu-session).
+require("default.hypr.require_optional").module("hypr.gpu")
+
 -- Add any other personal Hyprland configuration below.
 -- o.window("qemu", { workspace = "5" })

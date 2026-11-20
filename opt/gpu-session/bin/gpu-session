@@ -1,0 +1,438 @@
+#!/usr/bin/env bash
+# gpu-session — Idempotent dual-GPU session switcher and RTX 3070 AI isolation status tool.
+#
+# Pins the Omarchy/Hyprland/UWSM desktop session to either:
+#   rx580    AMD Radeon RX 580 (04:00.0) for display; isolates RTX 3070 (2b:00.0) for AI/CUDA
+#   rtx3070  NVIDIA GeForce RTX 3070 (2b:00.0) for desktop display and rendering
+#
+# Keeps the nvidia kernel module loaded in both modes so CUDA/NVML works on the RTX 3070
+# even while the desktop runs exclusively on the RX 580.
+set -euo pipefail
+
+readonly RX580_PCI="0000:04:00.0"
+readonly RX580_BY_PATH="/dev/dri/by-path/pci-0000:04:00.0-card"
+readonly RTX3070_PCI="0000:2b:00.0"
+readonly RTX3070_BY_PATH="/dev/dri/by-path/pci-0000:2b:00.0-card"
+
+readonly CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}"
+readonly ENV_DIR="$CONFIG_DIR/uwsm/env.d"
+readonly ENV_FILE="$ENV_DIR/10-gpu.conf"
+
+DRY_RUN=0
+JSON_OUT=0
+COMMAND=""
+
+usage() {
+  cat <<'EOF'
+Usage: gpu-session [status [--json] | rx580 | rtx3070] [-n|--dry-run]
+
+Commands:
+  status [--json]    Report configured target, active display GPU, outputs,
+                     RTX 3070 VRAM usage, and desktop process isolation (default)
+  rx580              Pin desktop session to RX 580; isolate RTX 3070 for AI
+                     (aliases: amd, 580)
+  rtx3070            Pin desktop session to RTX 3070
+                     (aliases: nvidia, 3070)
+
+Options:
+  -n, --dry-run      Show planned changes without modifying files
+  -h, --help         Show this help message
+EOF
+}
+
+die() {
+  printf 'gpu-session: %s\n' "$*" >&2
+  exit 1
+}
+
+if [[ "$(id -u)" -eq 0 ]]; then
+  die "run as your normal user, not root"
+fi
+
+while (( $# > 0 )); do
+  case "$1" in
+    -n|--dry-run)
+      DRY_RUN=1
+      shift
+      ;;
+    --json)
+      JSON_OUT=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    status)
+      [[ -z "$COMMAND" ]] || die "unexpected argument: $1"
+      COMMAND="status"
+      shift
+      ;;
+    rx580|amd|580)
+      [[ -z "$COMMAND" ]] || die "unexpected argument: $1"
+      COMMAND="rx580"
+      shift
+      ;;
+    rtx3070|nvidia|3070)
+      [[ -z "$COMMAND" ]] || die "unexpected argument: $1"
+      COMMAND="rtx3070"
+      shift
+      ;;
+    *)
+      usage >&2
+      die "unknown argument: $1"
+      ;;
+  esac
+done
+
+COMMAND="${COMMAND:-status}"
+if (( JSON_OUT )) && [[ "$COMMAND" != "status" ]]; then
+  die "--json is only valid with 'status'"
+fi
+
+read_configured_target() {
+  if [[ -r "$ENV_FILE" ]]; then
+    local line
+    line="$(grep -m1 '^# quattro-dots gpu-session: target=' "$ENV_FILE" 2>/dev/null || true)"
+    case "${line#*=}" in
+      rx580|rtx3070)
+        printf '%s\n' "${line#*=}"
+        return 0
+        ;;
+    esac
+  fi
+  printf '%s\n' "rx580"
+}
+
+is_boot_vga() {
+  local pci="$1"
+  local f="/sys/bus/pci/devices/$pci/boot_vga"
+  if [[ -r "$f" ]] && [[ "$(< "$f")" == "1" ]]; then
+    printf 'true\n'
+  else
+    printf 'false\n'
+  fi
+}
+
+connected_outputs_for_pci() {
+  local pci="$1"
+  local st base conn
+  shopt -s nullglob
+  for st in "/sys/bus/pci/devices/$pci"/drm/card*/card*-*/status; do
+    [[ -r "$st" ]] || continue
+    if [[ "$(< "$st")" == "connected" ]]; then
+      base="$(basename "$(dirname "$st")")"
+      conn="${base#card*-}"
+      printf '%s\n' "$conn"
+    fi
+  done
+  shopt -u nullglob
+}
+
+drm_nodes_for_pci() {
+  local pci="$1"
+  local node name
+  shopt -s nullglob
+  for node in "/sys/bus/pci/devices/$pci"/drm/card* "/sys/bus/pci/devices/$pci"/drm/renderD*; do
+    [[ -e "$node" ]] || continue
+    name="$(basename "$node")"
+    if [[ -e "/dev/dri/$name" ]]; then
+      printf '/dev/dri/%s\n' "$name"
+    fi
+  done
+  shopt -u nullglob
+}
+
+read_hyprland_env_var() {
+  local var_name="$1"
+  local pid
+  pid="$(pgrep -n Hyprland 2>/dev/null || true)"
+  [[ -n "$pid" && -r "/proc/$pid/environ" ]] || return 0
+  tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | awk -F= -v k="$var_name" '$1 == k { print substr($0, length(k) + 2); exit }'
+}
+
+build_env_content() {
+  local target="$1"
+  cat <<EOF
+# quattro-dots gpu-session: target=$target
+# Sourced by UWSM (/bin/sh) before Hyprland starts.
+# Safety fallback: if DisplayPort cables were moved to the other GPU during
+# shutdown without running gpu-session first, fall back to whichever GPU has
+# connected displays so the desktop does not boot to a black screen.
+
+__quattro_gpu_target="$target"
+__quattro_rx580_connected=0
+__quattro_3070_connected=0
+
+for __quattro_st in /sys/bus/pci/devices/$RX580_PCI/drm/card*/card*-*/status; do
+  [ -r "\$__quattro_st" ] || continue
+  if [ "\$(cat "\$__quattro_st" 2>/dev/null)" = "connected" ]; then
+    __quattro_rx580_connected=1
+    break
+  fi
+done
+
+for __quattro_st in /sys/bus/pci/devices/$RTX3070_PCI/drm/card*/card*-*/status; do
+  [ -r "\$__quattro_st" ] || continue
+  if [ "\$(cat "\$__quattro_st" 2>/dev/null)" = "connected" ]; then
+    __quattro_3070_connected=1
+    break
+  fi
+done
+
+if [ "\$__quattro_gpu_target" = "rx580" ] && [ "\$__quattro_rx580_connected" -eq 0 ] && [ "\$__quattro_3070_connected" -eq 1 ]; then
+  __quattro_gpu_target="rtx3070"
+elif [ "\$__quattro_gpu_target" = "rtx3070" ] && [ "\$__quattro_3070_connected" -eq 0 ] && [ "\$__quattro_rx580_connected" -eq 1 ]; then
+  __quattro_gpu_target="rx580"
+fi
+
+if [ "\$__quattro_gpu_target" = "rtx3070" ]; then
+  export QUATTRO_GPU_SESSION="rtx3070"
+  export AQ_DRM_DEVICES="$RTX3070_BY_PATH"
+  export __EGL_VENDOR_LIBRARY_FILENAMES="/usr/share/glvnd/egl_vendor.d/10_nvidia.json"
+  export __GLX_VENDOR_LIBRARY_NAME="nvidia"
+  export LIBVA_DRIVER_NAME="nvidia"
+  export NVD_BACKEND="direct"
+  export VK_DRIVER_FILES="/usr/share/vulkan/icd.d/nvidia_icd.json"
+  unset VDPAU_DRIVER
+else
+  export QUATTRO_GPU_SESSION="rx580"
+  export AQ_DRM_DEVICES="$RX580_BY_PATH"
+  export __EGL_VENDOR_LIBRARY_FILENAMES="/usr/share/glvnd/egl_vendor.d/50_mesa.json"
+  export __GLX_VENDOR_LIBRARY_NAME="mesa"
+  export LIBVA_DRIVER_NAME="radeonsi"
+  export VDPAU_DRIVER="radeonsi"
+  export VK_DRIVER_FILES="/usr/share/vulkan/icd.d/radeon_icd.json"
+  unset NVD_BACKEND
+fi
+
+unset __quattro_gpu_target __quattro_rx580_connected __quattro_3070_connected __quattro_st
+EOF
+}
+
+cmd_switch() {
+  local target="$1"
+  local tmp current_status="unchanged"
+  tmp="$(mktemp)"
+  trap 'rm -f "${tmp:-}"' RETURN
+  build_env_content "$target" > "$tmp"
+
+  # Validate generated POSIX shell syntax the same way UWSM prepare-env.sh does.
+  sh -n "$tmp" || die "generated environment file failed sh -n syntax check"
+
+  if [[ -L "$ENV_FILE" ]]; then
+    current_status="symlink->file"
+  elif [[ ! -f "$ENV_FILE" ]]; then
+    current_status="created"
+  elif ! cmp -s "$tmp" "$ENV_FILE"; then
+    current_status="updated"
+  fi
+
+  if (( DRY_RUN )); then
+    printf '[dry-run] %s (%s -> target=%s)\n' "$ENV_FILE" "$current_status" "$target"
+    return 0
+  fi
+
+  if [[ "$current_status" != "unchanged" ]]; then
+    mkdir -p "$ENV_DIR"
+    if [[ -L "$ENV_FILE" ]]; then
+      rm -f "$ENV_FILE"
+    fi
+    install -m 0644 "$tmp" "$ENV_FILE"
+    printf 'gpu-session: %s target=%s (%s)\n' "$ENV_FILE" "$target" "$current_status"
+  else
+    printf 'gpu-session: %s already set to target=%s (up-to-date)\n' "$ENV_FILE" "$target"
+  fi
+
+  local next_step
+  if [[ "$target" == "rx580" ]]; then
+    next_step="Ensure displays are plugged into the RX 580, then shut down/reboot (or log out/in if already cabled to RX 580)."
+  else
+    next_step="Shut down, move DisplayPort cables to the RTX 3070, and boot back up."
+  fi
+  printf '%s\n' "$next_step"
+
+  if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] && command -v omarchy-notification-send >/dev/null 2>&1; then
+    omarchy-notification-send "GPU Session: ${target^^} staged" "$next_step" >/dev/null 2>&1 || true
+  fi
+}
+
+cmd_status() {
+  local configured_target rx_boot_vga rtx_boot_vga
+  local -a rx_outputs=() rtx_outputs=()
+  configured_target="$(read_configured_target)"
+  rx_boot_vga="$(is_boot_vga "$RX580_PCI")"
+  rtx_boot_vga="$(is_boot_vga "$RTX3070_PCI")"
+  mapfile -t rx_outputs < <(connected_outputs_for_pci "$RX580_PCI")
+  mapfile -t rtx_outputs < <(connected_outputs_for_pci "$RTX3070_PCI")
+
+  local hypr_gpu_session hypr_aq_drm aquamarine_isolated="false" active_gpu="unknown"
+  hypr_gpu_session="$(read_hyprland_env_var "QUATTRO_GPU_SESSION")"
+  hypr_aq_drm="$(read_hyprland_env_var "AQ_DRM_DEVICES")"
+  if [[ -n "$hypr_aq_drm" ]]; then
+    aquamarine_isolated="true"
+  fi
+
+  if [[ "$hypr_gpu_session" == "rx580" || "$hypr_gpu_session" == "rtx3070" ]]; then
+    active_gpu="$hypr_gpu_session"
+  elif [[ "$hypr_aq_drm" == *"$RX580_PCI"* ]]; then
+    active_gpu="rx580"
+  elif [[ "$hypr_aq_drm" == *"$RTX3070_PCI"* ]]; then
+    active_gpu="rtx3070"
+  elif (( ${#rx_outputs[@]} > 0 )) && (( ${#rtx_outputs[@]} == 0 )); then
+    active_gpu="rx580"
+  elif (( ${#rtx_outputs[@]} > 0 )) && (( ${#rx_outputs[@]} == 0 )); then
+    active_gpu="rtx3070"
+  elif [[ "$rx_boot_vga" == "true" ]]; then
+    active_gpu="rx580"
+  elif [[ "$rtx_boot_vga" == "true" ]]; then
+    active_gpu="rtx3070"
+  fi
+
+  local vram_used=0 vram_total=0 temp_c=0 power_w="0" compute_count=0
+  local -A compute_pids=()
+  if command -v nvidia-smi >/dev/null 2>&1; then
+    local smi_stats
+    smi_stats="$(nvidia-smi -i "$RTX3070_PCI" --query-gpu=memory.used,memory.total,temperature.gpu,power.draw --format=csv,noheader,nounits 2>/dev/null | head -n1 || true)"
+    if [[ -n "$smi_stats" ]]; then
+      local raw_used raw_total raw_temp raw_power
+      IFS=',' read -r raw_used raw_total raw_temp raw_power <<<"$smi_stats"
+      raw_used="${raw_used//[[:space:]]/}"
+      raw_total="${raw_total//[[:space:]]/}"
+      raw_temp="${raw_temp//[[:space:]]/}"
+      raw_power="${raw_power//[[:space:]]/}"
+      if [[ "$raw_used" =~ ^[0-9]+$ ]]; then vram_used="$raw_used"; fi
+      if [[ "$raw_total" =~ ^[0-9]+$ ]]; then vram_total="$raw_total"; fi
+      if [[ "$raw_temp" =~ ^[0-9]+$ ]]; then temp_c="$raw_temp"; fi
+      if [[ -n "$raw_power" && "$raw_power" != "[N/A]" ]]; then power_w="$raw_power"; fi
+    fi
+
+    local cpid
+    while IFS= read -r cpid; do
+      cpid="${cpid//[[:space:]]/}"
+      [[ "$cpid" =~ ^[0-9]+$ ]] || continue
+      compute_pids["$cpid"]=1
+      compute_count=$((compute_count + 1))
+    done < <(nvidia-smi -i "$RTX3070_PCI" --query-compute-apps=pid --format=csv,noheader 2>/dev/null || true)
+  fi
+
+  local -a rtx_dev_nodes=()
+  mapfile -t rtx_dev_nodes < <(drm_nodes_for_pci "$RTX3070_PCI")
+  if [[ -e /dev/nvidia0 ]]; then rtx_dev_nodes+=("/dev/nvidia0"); fi
+  if [[ -e /dev/nvidia-modeset ]]; then rtx_dev_nodes+=("/dev/nvidia-modeset"); fi
+
+  local -A seen_holder_pids=()
+  local -a holder_pids=() holder_names=()
+  if (( ${#rtx_dev_nodes[@]} > 0 )) && command -v fuser >/dev/null 2>&1; then
+    local fuser_out tok pid comm
+    fuser_out="$(fuser "${rtx_dev_nodes[@]}" 2>/dev/null || true)"
+    for tok in $fuser_out; do
+      pid="${tok//[^0-9]/}"
+      [[ -n "$pid" ]] || continue
+      [[ -z "${compute_pids[$pid]:-}" ]] || continue
+      [[ -z "${seen_holder_pids[$pid]:-}" ]] || continue
+      seen_holder_pids["$pid"]=1
+      comm="$(cat "/proc/$pid/comm" 2>/dev/null || printf 'pid:%s' "$pid")"
+      [[ "$comm" == "nvidia-smi" || "$comm" == "fuser" ]] && continue
+      holder_pids+=("$pid")
+      holder_names+=("$comm")
+    done
+  fi
+
+  local rtx_isolated="false"
+  if [[ "$active_gpu" == "rx580" ]] && [[ "$aquamarine_isolated" == "true" ]] && (( ${#holder_pids[@]} == 0 )); then
+    rtx_isolated="true"
+  fi
+
+  local pending_reboot="false"
+  if [[ "$configured_target" != "$active_gpu" ]]; then
+    pending_reboot="true"
+  elif [[ "$configured_target" == "rx580" ]] && [[ "$aquamarine_isolated" != "true" ]]; then
+    pending_reboot="true"
+  fi
+
+  if (( JSON_OUT )); then
+    local rx_outputs_json rtx_outputs_json holder_pids_json holder_names_json
+    rx_outputs_json="$(printf '%s\n' "${rx_outputs[@]+"${rx_outputs[@]}"}" | jq -Rsc 'split("\n") | map(select(length > 0))')"
+    rtx_outputs_json="$(printf '%s\n' "${rtx_outputs[@]+"${rtx_outputs[@]}"}" | jq -Rsc 'split("\n") | map(select(length > 0))')"
+    holder_pids_json="$(printf '%s\n' "${holder_pids[@]+"${holder_pids[@]}"}" | jq -Rsc 'split("\n") | map(select(length > 0) | tonumber)')"
+    holder_names_json="$(printf '%s\n' "${holder_names[@]+"${holder_names[@]}"}" | jq -Rsc 'split("\n") | map(select(length > 0))')"
+
+    jq -n \
+      --arg configuredTarget "$configured_target" \
+      --arg activeGpu "$active_gpu" \
+      --argjson pendingReboot "$pending_reboot" \
+      --argjson aquamarineIsolated "$aquamarine_isolated" \
+      --argjson rxBootVga "$rx_boot_vga" \
+      --argjson rxOutputs "$rx_outputs_json" \
+      --argjson rtxBootVga "$rtx_boot_vga" \
+      --argjson rtxOutputs "$rtx_outputs_json" \
+      --argjson vramUsedMiB "$vram_used" \
+      --argjson vramTotalMiB "$vram_total" \
+      --argjson tempC "$temp_c" \
+      --arg powerW "$power_w" \
+      --argjson computeProcesses "$compute_count" \
+      --argjson desktopHolderPids "$holder_pids_json" \
+      --argjson desktopHolderNames "$holder_names_json" \
+      --argjson isolated "$rtx_isolated" \
+      '{
+        configuredTarget: $configuredTarget,
+        activeGpu: $activeGpu,
+        pendingReboot: $pendingReboot,
+        aquamarineIsolated: $aquamarineIsolated,
+        rx580: {
+          name: "AMD Radeon RX 580",
+          pci: "04:00.0",
+          bootVga: $rxBootVga,
+          outputs: $rxOutputs
+        },
+        rtx3070: {
+          name: "NVIDIA GeForce RTX 3070",
+          pci: "2b:00.0",
+          bootVga: $rtxBootVga,
+          outputs: $rtxOutputs,
+          vramUsedMiB: $vramUsedMiB,
+          vramTotalMiB: $vramTotalMiB,
+          tempC: $tempC,
+          powerW: $powerW,
+          computeProcesses: $computeProcesses,
+          desktopHolderPids: $desktopHolderPids,
+          desktopHolderNames: $desktopHolderNames,
+          isolated: $isolated
+        }
+      }'
+    return 0
+  fi
+
+  local rx_out_str rtx_out_str holders_str
+  rx_out_str="${rx_outputs[*]:-none}"
+  rtx_out_str="${rtx_outputs[*]:-none}"
+  if (( ${#holder_names[@]} > 0 )); then
+    holders_str=""
+    local i
+    for (( i = 0; i < ${#holder_names[@]}; i++ )); do
+      holders_str+="${holders_str:+, }${holder_names[$i]} (${holder_pids[$i]})"
+    done
+  else
+    holders_str="none"
+  fi
+
+  printf 'Configured target : %s (%s)\n' "$configured_target" "$ENV_FILE"
+  printf 'Active display GPU: %s\n' "$active_gpu"
+  printf 'Aquamarine DRM pin: %s\n' "$aquamarine_isolated"
+  printf 'Action pending    : %s\n' "$pending_reboot"
+  printf 'RX 580 (04:00.0)  : boot_vga=%s | outputs=%s\n' "$rx_boot_vga" "$rx_out_str"
+  printf 'RTX 3070 (2b:00.0): boot_vga=%s | outputs=%s | isolated=%s\n' "$rtx_boot_vga" "$rtx_out_str" "$rtx_isolated"
+  printf 'RTX 3070 telemetry: %s / %s MiB VRAM | %s C | %s W | compute_apps=%s\n' \
+    "$vram_used" "$vram_total" "$temp_c" "$power_w" "$compute_count"
+  printf 'RTX 3070 desktop  : %s\n' "$holders_str"
+}
+
+case "$COMMAND" in
+  status)
+    cmd_status
+    ;;
+  rx580|rtx3070)
+    cmd_switch "$COMMAND"
+    ;;
+esac

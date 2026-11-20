@@ -29,6 +29,9 @@ This repository provides a streamlined configuration tailored for Omarchy 4.5+. 
 - **`starship/`** → `~/.config/` (permissions: `0644`)
   - Cross-shell prompt configuration (`starship/starship.toml` -> `~/.config/starship.toml`).
   - See `starship/AGENTS.md` for prompt configuration details.
+- **`opt/`** → Host-specific opt-in configurations (not installed by top-level `./install.sh`)
+  - Self-contained installers for hardware- or host-specific setups (e.g., `opt/gpu-session/`).
+  - See `opt/AGENTS.md` for opt-in module details.
 
 ## Installation
 
